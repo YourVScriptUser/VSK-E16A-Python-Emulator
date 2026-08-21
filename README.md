@@ -6,18 +6,27 @@
 The VSK-E16A is a simple 16-bit emulator written in python.
 
 Includes:
+
   stack-based PMIO (see PMIO STACK)
+  
   64K Of word-addressed memory (see ADDRESSING)
+  
   256-word IVT (see Interrupts)
+  
   hardware interrupts (see Interrupts)
 
   speed (iF 0): ~800khz max
+  
   speed (iF 1): ~200khz max
+  
   max speed is different based on HWI status as `check_HWI_status()` is taxing on performance
+  
   64K-word addressed 'disk' (see disk)
 
   fully compatible with PyPy3
+  
   .vsix vscode extension for xasme16a syntax highlighting and hover explanations inside
+  
   much more in-depth (VIBE CODED!!!) .HTML manual inside
 
   included full OS (ahoxOS) and official BIOS source
@@ -45,7 +54,7 @@ Please note that:
        - The debugger GUI
        - .HTML manual
        - Disassembler
-  3. This was never meant to be a publically released project, therefore the paths are fixed to 'C:\python\VSK-E16A Workspace\', but booting .img and imaging .xsm files outside of this dir are still supported.
+  3. This was never meant to be a publicly released project, therefore the paths are fixed to 'C:\python\VSK-E16A Workspace\', but booting .img and imaging .xsm files outside of this dir are still supported.
      
 
 
