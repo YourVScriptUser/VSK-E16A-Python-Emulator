@@ -31,6 +31,8 @@ Includes:
 
   included full OS (ahoxOS) and official BIOS source
 
+  included boot.bat file (requires wezterm)
+
 
 
 The assembler for xasme16a lives inside the emulator (see pre-run shell)
