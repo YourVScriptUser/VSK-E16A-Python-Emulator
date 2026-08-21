@@ -1,0 +1,115 @@
+{
+  "name": "vsk-e16a-asm",
+  "displayName": "VSK-E16A Assembly",
+  "description": "Language support for VSK-E16A (Xasm16A Extended) assembly: syntax highlighting, opcode hovers, and label hovers.",
+  "version": "0.1.0",
+  "publisher": "vsk-tools",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onLanguage:xasm16a"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "xasm16a",
+        "aliases": [
+          "VSK-E16A Assembly",
+          "xasm16a"
+        ],
+        "extensions": [
+          ".xsm",
+          ".xasm",
+          ".xasm16a"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "xasm16a",
+        "scopeName": "source.xasm16a",
+        "path": "./syntaxes/xasm16a.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "VSK-E16A Colors (Dark)",
+        "uiTheme": "vs-dark",
+        "path": "./themes/vsk-e16a-color-theme.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "vsk-e16a-asm.smartTabIndent",
+        "title": "VSK-E16A: Smart Label Indent"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vsk-e16a-asm.smartTabIndent",
+        "key": "tab",
+        "when": "editorTextFocus && editorLangId == xasm16a && !editorHasSelection && !editorReadonly && !suggestWidgetVisible"
+      }
+    ],
+    "configurationDefaults": {
+      "[xasm16a]": {
+        "editor.bracketPairColorization.enabled": false,
+        "editor.tokenColorCustomizations": {
+          "textMateRules": [
+            {
+              "scope": "variable.language.register.xasm16a",
+              "settings": {
+                "foreground": "#4EA1F3"
+              }
+            },
+            {
+              "scope": [
+                "constant.numeric.decimal.xasm16a",
+                "constant.numeric.hex.xasm16a"
+              ],
+              "settings": {
+                "foreground": "#4EC94E"
+              }
+            },
+            {
+              "scope": "comment.line.semicolon.xasm16a",
+              "settings": {
+                "foreground": "#2E7D32"
+              }
+            },
+            {
+              "scope": "keyword.control.opcode.xasm16a",
+              "settings": {
+                "foreground": "#C586C0"
+              }
+            },
+            {
+              "scope": "keyword.control.directive.xasm16a",
+              "settings": {
+                "foreground": "#D9534F"
+              }
+            },
+            {
+              "scope": [
+                "entity.name.function.label.xasm16a",
+                "entity.name.function.label-ref.xasm16a"
+              ],
+              "settings": {
+                "foreground": "#DCDCAA"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "echo no-build-step"
+  }
+}

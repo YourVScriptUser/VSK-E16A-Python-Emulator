@@ -1,0 +1,124 @@
+; A test for the new BIOS that prints 'GO BIOS' using BIOS teletype
+
+
+
+; BMT
+%region 0x1100
+%defineword 0x55AA
+%defineword 0x1200
+%defineword "BIOS Teletype test", 0
+
+%region 0x1200
+int 0x02
+
+mov r1, G
+mov r0, [r1]
+int 0x0E
+
+mov r1, O
+mov r0, [r1]
+int 0x0E
+
+mov r1, SPACE
+mov r0, [r1]
+int 0x0E
+
+mov r1, B
+mov r0, [r1]
+int 0x0E
+
+mov r1, I
+mov r0, [r1]
+int 0x0E
+
+mov r1, O
+mov r0, [r1]
+int 0x0E
+
+mov r1, S
+mov r0, [r1]
+int 0x0E
+
+dhi
+hlt
+
+SPACE:
+%defineword 32
+
+A:
+%defineword "A"
+
+B:
+%defineword "B"
+
+C:
+%defineword "C"
+
+D:
+%defineword "D"
+
+E:
+%defineword "E"
+
+F:
+%defineword "F"
+
+G:
+%defineword "G"
+
+H:
+%defineword "H"
+
+I:
+%defineword "I"
+
+J:
+%defineword "J"
+
+K:
+%defineword "K"
+
+L:
+%defineword "L"
+
+M:
+%defineword "M"
+
+N:
+%defineword "N"
+
+O:
+%defineword "O"
+
+P:
+%defineword "P"
+
+Q:
+%defineword "Q"
+
+R:
+%defineword "R"
+
+S:
+%defineword "S"
+
+T:
+%defineword "T"
+
+U:
+%defineword "U"
+
+V:
+%defineword "V"
+
+W:
+%defineword "W"
+
+X:
+%defineword "X"
+
+Y:
+%defineword "Y"
+
+Z:
+%defineword "Z"

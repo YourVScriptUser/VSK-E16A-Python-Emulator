@@ -1,0 +1,39 @@
+{
+  "name": "VSK-E16A Colors",
+  "type": "dark",
+  "colors": {},
+  "tokenColors": [
+    {
+      "scope": "variable.language.register.xasm16a",
+      "settings": { "foreground": "#4EA1F3" }
+    },
+    {
+      "scope": ["constant.numeric.decimal.xasm16a", "constant.numeric.hex.xasm16a"],
+      "settings": { "foreground": "#4EC94E" }
+    },
+    {
+      "scope": "comment.line.semicolon.xasm16a",
+      "settings": { "foreground": "#2E7D32" }
+    },
+    {
+      "scope": "keyword.control.opcode.xasm16a",
+      "settings": { "foreground": "#C586C0" }
+    },
+    {
+      "scope": "keyword.control.directive.xasm16a",
+      "settings": { "foreground": "#D9534F" }
+    },
+    {
+      "scope": ["entity.name.function.label.xasm16a", "entity.name.function.label-ref.xasm16a"],
+      "settings": { "foreground": "#DCDCAA", "fontStyle": "bold" }
+    },
+    {
+      "scope": "string.quoted.double.xasm16a",
+      "settings": { "foreground": "#CE9178" }
+    },
+    {
+      "scope": "string.quoted.single.xasm16a",
+      "settings": { "foreground": "#CE9178" }
+    }
+  ]
+}

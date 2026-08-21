@@ -1,0 +1,2246 @@
+; =============================================================================
+; Copyright (c) 2026 VSK Software
+;
+; Permission is granted to use, modify, compile, and redistribute this source
+; code, provided the following conditions are met:
+;
+;   - This copyright notice must remain intact.
+;   - Any modified versions must clearly state that changes were made.
+;   - Credit must be given to the original author when redistributing
+;     modified copies.
+;
+; You may not claim this source, or any part of it, as your own work, whether
+; it has been modified or not.
+;
+; This software is provided "AS IS", without warranty of any kind. The author
+; is not liable for any damages resulting from its use.
+; =============================================================================
+ 
+; OS for the VSK-16A (but ported to the VSK-E16A)
+
+
+; VBPT:
+ 
+; 0x1100: Boot signature (0x55AA)
+; 0x1101: OS entrypoint
+; 0x1102-...: OS string name
+; expects OS string name to be null-terminated
+ 
+;NOTE:
+; Old OSes that still booted at a fixed 0x0900 will still boot.
+ 
+; IVT:
+; General Purpose
+ 
+; 0x01: Clear keyboard buffer />
+;  No register operands
+ 
+; 0x02: Clear video buffer    />
+;  No register operands
+ 
+; 0x0E: Teletype              />
+;  r0: ascii char
+ 
+; 0x0F: Await enter
+;  No register operands
+ 
+; Hardware
+; 0x10: Disk read             />
+;  r0: disk address
+; Returns the read value in r0
+ 
+; 0x11: Disk write            />
+;  r0: Disk address
+;  r1: Disk value (what to write)
+ 
+; 0x12: Reset                 />
+;  No register operands
+ 
+; Hardware interrupts
+; 0xEF: Keyboard         (mapped by emulator)
+; 0xFF: GPF Fault vector (mapped by emulator)
+ 
+; rest is general for software
+
+
+; BIOS is injected into memory at startup (any previous code before 0x0900 will be wiped)
+ 
+; ahoxOS: an OS for the VSK-E16A
+; OS kernel will be loaded at 0x1200
+ 
+; Registers have dedicated uses:
+; r0-r7    :  Scratch Registers   :  use these as you want (like temporary comparisons)
+; r8-r12   :  Argument Registers  :  only to be used for arguments to functions/labels/interrupts (like the start of a string)
+; r13-r15  :  Dedicated pointers  :  Dynamic pointers (like screen cursors)
+ 
+; Please take note that this is a ported OS from the vsk-16a and some comments will be completley incorrect with how the VSK-E16A works.
+ 
+; Boot table
+%region 0x1100
+OS_REGION_BEGIN:
+; Signature
+%defineword 0x55AA
+; Entrypoint
+%defineword 0x1200
+; Name
+%defineword "AhoxOS Kernel for the VSK-E16A", 0
+
+
+
+
+
+
+
+
+
+
+; KERNEL ====================================================
+ 
+%region 0x1200
+jmp KERNEL_ENTP
+ 
+; program table
+%defineword 0x9BA4
+%defineword 0x9BA4
+; entrypoint
+%defineword 0x1200
+; string name
+%defineword "kernel code", 0
+ 
+KERNEL_ENTP:
+; Kernel entrypoint address
+jmp kern_start
+ 
+; KERNEL INIT CODE
+; -------------------------------
+  ; Kernel initialization code
+  ; **Register Arguments:**
+  ; `Takes no arguments.`
+  ;
+  ; Init process:
+  ; **1:** *Clear the screen*
+  ; **2:** *Initialize fault vector*
+  ; **3:** *Move the stack address from the BIOS stack address to the kernel stack address*
+  ; **4:** *Initialize screen cursor (Register 13) to the base of extended mode screen memory*
+  ; **5:** *Initialize the SDT*
+  ;
+  ; Note: uses the panic routine's barebones stinky fallback print system to print early initialization messages
+  ; ****The Main OS Entrypoint****
+kern_start:
+  int 0x02 ; BIOS interrupt wipe extended/legacy screen memory (clear the screen)
+  dhi      ; disable HWIs
+  ; initialize fault vector
+  mov [0x00FF], PANIC_VECTOR_ADDRESS
+ 
+  ; Move SP to a dedicated stack region
+  mov r0, STACK_BASE_ADDRESS
+  movsp r0
+ 
+  call free_video
+  load r4, "#kern_start fault ISR enabled"
+  call panic_newline
+ 
+  call free_video
+  load r4, "#kern_start kernel stack created"
+  call panic_newline
+ 
+  ; --------------
+  ; Set screen cursor / setup syscalls / start printing logs (init_syscall prints logs after print syscall is initialized!)
+  call get_next
+  mov r13, VGA_START
+  add r13, r4, r13  ; initalize it to the end of where the current barebones logs are
+ 
+  call free_video
+  load r4, "#kern_start terminal driver enabled"
+  call panic_newline
+ 
+  call free_video
+  load r4, "#kern_start starting system call handler"
+  call panic_newline
+  call panic_newline
+ 
+  call get_next
+  mov r13, VGA_START
+  add r13, r4, r13 ; re-init this.
+ 
+  call init_syscall
+ 
+  mov r9, VECTOR_TRAP_LOG_BEFORE
+  call log_ok
+ 
+  call init_vector_trap
+ 
+  mov r9, VECTOR_TRAP_LOG
+  call log_ok
+ 
+  mov r9, EXTENDED_VIDEO_MODE_LOG
+  call log_ok
+ 
+  ; --------------
+ 
+  ; Print banner
+  call newline
+  mov r9, OS_STRING_NAME   ; string to print
+  call kprint
+ 
+  call space
+  mov r9, OS_KERNEL_VERSION
+  call kprint
+ 
+  call newline
+  call newline
+  call newline
+ 
+  call print_process_table
+ 
+  call newline
+  call newline
+  call newline
+  call newline
+  call newline
+  call newline
+ 
+  mov r9, SHELL_MESSAGE
+  call kprint
+ 
+  call newline
+ 
+  jmp SHELL_ENTP
+ 
+  EXTENDED_VIDEO_MODE_LOG:
+    %defineword "extended video mode enabled", 0
+ 
+  VECTOR_TRAP_LOG:
+    %defineword "invalid interrupt trap installed", 0
+ 
+  VECTOR_TRAP_LOG_BEFORE:
+    %defineword "installing invalid interrupt trap", 0
+ 
+  SHELL_MESSAGE:
+    %defineword "type 'help' for a list of commands.", 0
+ 
+init_vector_trap:
+  mov r5, 0x0006
+  mov r6, 0x000A
+  call _ivt_trap_write
+  ret
+ 
+_ivt_trap_write:
+  mov [r5], invalid_interrupt
+  inc r5
+  cmp r5, r6
+  jh _dn
+  jmp _ivt_trap_write
+ 
+_dn:
+  ret
+ 
+invalid_interrupt:
+  mov r9, INVALID_INTERRUPT_ERRROR_STR
+  call log_warn
+ 
+  ret
+ 
+  INVALID_INTERRUPT_ERRROR_STR:
+    %defineword "Invalid interrupt ignored"
+ 
+; -------------------------------
+  ; Syscall initialization code
+  ; **Register Arguments:**
+  ; `Takes no arguments.`
+  ;
+  ; Fills the SDT (Sycall Dispatch Table) table with pointers that point to syscall functions
+  ; ****This is the first lump of code that prints logs using syscall print****
+  ;
+  ; *here at VSK, we love dogfooding our own api*
+init_syscall:
+  mov [0x8001], SYSCALL_PRINT ; ID 1
+ 
+  call init_log_service
+ 
+  mov r9, SETUP_TEXT
+  call log_ok
+  mov r9, SYS_1
+  call log_ok
+ 
+  mov [0x8002], SYSCALL_LEN   ; ID 2
+  mov r9, SYS_2
+  call log_ok
+ 
+  mov [0x8003], SYSCALL_MEMCPY
+  mov r9, SYS_3
+  call log_ok
+ 
+  mov [0x8004], SYSCALL_MEMCLR
+  mov r9, SYS_4
+  call log_ok
+ 
+  mov [0x8005], SYSCALL_STRCMP
+  mov r9, SYS_5
+  call log_ok
+ 
+  mov r9, SETUP_FINISH
+  call log_ok
+ 
+  ret
+ 
+  ; =============
+  ; strings =====
+  SETUP_TEXT:
+    %defineword "populating SDT", 0
+ 
+  SYS_1:
+    %defineword "syscall strprint installed with id 1", 0
+  SYS_2:
+    %defineword "syscall lenmem installed with id 2", 0
+  SYS_3:
+    %defineword "syscall memcpy installed with id 3", 0
+  SYS_4:
+    %defineword "syscall memclr installed with id 4", 0
+  SYS_5:
+    %defineword "syscall strcmp installed with id 5", 0
+ 
+  SETUP_FINISH:
+    %defineword "SDT populated", 0
+ 
+free_video:
+  ; barebones label for printing early initialization messages inside kern_start
+  ; not to be used after syscall print has been initalized
+  ; using it after will print but will be erased after a print syscall since this does not advace the video cursor in register 13
+  ; not important enough to add a entry to the trace
+  ; free location will be returned in r4
+  ; uses the panic routine fallback print system
+ 
+  call get_next   ; this label lives all the way down at the panic code lol
+  mov r0, VGA_START
+  add r0, r4, r4
+ 
+  vout
+  ret
+ 
+print_process_table:
+  dhi
+  ;#far
+  ; Prints the process table to the terminal.
+  mov r0, OS_REGION_BEGIN    ; VAR POINTER
+  mov r1, PROCESS_MAGIC      ; CONST MAGIC
+  mov r2, 0                  ; VAR CURRENT
+  mov r3, PROCESS_REGION_END ; CONST END
+ 
+  push r0
+  push r1
+  push r2
+  push r3
+ 
+  mov r9, PROCESS_TABLE_TEXT
+  call kprint
+  call newline
+ 
+  pop r3
+  pop r2
+  pop r1
+  pop r0
+ 
+  jmp print_process_table_loop
+ 
+print_process_table_loop:
+  ; increment the pointer
+  inc r0
+ 
+  ; see if we have hit the end
+  cmp r0, r3
+  jh print_process_table_end
+ 
+  ; see if we have found a magic
+  mov r2, [r0]
+  cmp r2, r1
+  je print_process_table_magic_found_second
+ 
+  ; if not, repeat the loop
+  jmp print_process_table_loop
+ 
+print_process_table_magic_found_second:
+  inc r0
+  mov r2, [r0]
+  cmp r2, r1
+  je print_process_table_magic_found
+ 
+  jmp print_process_table_loop
+   
+ 
+print_process_table_magic_found:
+  inc r0
+ 
+  push r0
+  push r1
+  push r2
+  push r3
+ 
+  mov r9, LEFT_BRACKET
+  call kprint
+ 
+  pop r3
+  pop r2
+  pop r1
+  pop r0
+ 
+  push r0
+  push r1
+  push r2
+  push r3
+ 
+  push r0
+  mov r2, [r0]
+  mov r0, r2
+  call print_hex_r0
+  pop r0
+ 
+  mov r9, RIGHT_BRACKET
+  call kprint
+ 
+  mov r9, COLON
+  call kprint
+ 
+  call space
+ 
+  pop r3
+  pop r2
+  pop r1
+  pop r0
+ 
+  inc r0
+ 
+  push r0
+  push r1
+  push r2
+  push r3
+ 
+  mov r9, r0
+  call kprint
+  call newline
+ 
+  pop r3
+  pop r2
+  pop r1
+  pop r0
+ 
+  ; repeat
+  jmp print_process_table_loop
+ 
+  LEFT_BRACKET:
+    %defineword "[", 0
+ 
+  RIGHT_BRACKET:
+    %defineword "]", 0
+ 
+  LEFT_SMOOTH_BRACKET:
+    %defineword "(", 0
+ 
+  RIGHT_SMOOTH_BRACKET:
+    %defineword ")", 0
+ 
+  COLON:
+    %defineword ":", 0
+ 
+  PROCESS_TABLE_TEXT:
+    %defineword "Process Table:", 0
+ 
+print_process_table_end:
+  ehi
+  clf    ; clear flags
+  ret    ; return
+ 
+DEBUG_raise_litterally_every_single_error:
+  ; for debug uses only
+  ; plz dont call this anywhere unless testing
+  ; will also raise a kernel panic and nuke the len syscall so dont expect to recover from this
+  ; **basically just dont run this, you idiot!**
+ 
+ 
+  ; raise null syscall
+  mov r8, 77
+  call syscall
+ 
+  ; raise out of bounds syscall
+  mov r8, 300
+  call syscall
+ 
+  ; nuke len syscall by corrupting its signature
+  mov r0, SYSCALL_LEN
+  mov [r0], 0 ; the first address of every (offical) syscall is a signature
+ 
+  ; raise the corrupted syscall
+  mov r8, ID_SYSCALL_LEN_MEM
+  call syscall
+ 
+  ; raise a kernel panic via division by 0 (only works during early boot)
+  mov r0, 0
+  div r0, r0, r0
+
+
+
+
+
+
+
+
+
+
+; LOGGING =======================================================
+log_entp:
+; program table
+%defineword 0x9BA4
+%defineword 0x9BA4
+; entrypoint
+LOG_ENTP_TO_EDIT:
+%defineword 0
+; string name
+%defineword "logging service", 0
+ 
+init_log_service:
+  ;#far
+ 
+  mov r0, LOG_ENTP_TO_EDIT
+  mov r1, log_entp
+  mov [r0], r1
+  ret
+ 
+newline:
+  ;#far
+  mov r9, NEWLINE_CHAR
+  call kprint
+ 
+  ret
+ 
+space:
+  ;#far
+  mov r9, SPACE_CHAR
+  call kprint
+ 
+  ret
+ 
+LOG_TEXT_COLOR:
+  %defineword 133, 0
+ 
+CANCEL_COLOR:
+  %defineword 136, 0
+ 
+kprint:
+  ;#far
+  ; A helper for printing using syscall strprint
+  ; r9 is still the string to print (pointer)
+  ; does not print a newline!
+ 
+  mov r8, ID_SYSCALL_PRINT
+  ; expects r9 to hold the string address
+  call syscall
+ 
+  ret
+ 
+  log_ok:
+    ; prints a [ ok ] log then prints the string at [r9]
+    ; prints a newline
+ 
+    push r9
+    mov r9, LOG_TEXT_OK
+    call kprint
+    call space
+ 
+    mov r9, LOG_TEXT_COLOR
+    call kprint
+ 
+    pop r9
+    call kprint
+    call newline
+ 
+    mov r9, CANCEL_COLOR
+    call kprint
+ 
+    ret
+   
+   
+   
+  log_warn:
+    ;#far
+    ; prints a [warn] log then prints the string at [r9]
+    ; prints a newline
+ 
+    push r9
+    mov r9, LOG_TEXT_WARN
+    call kprint
+    call space
+ 
+    mov r9, LOG_TEXT_COLOR
+    call kprint
+ 
+    pop r9
+    call kprint
+    call newline
+ 
+    mov r9, CANCEL_COLOR
+    call kprint
+ 
+    ret
+ 
+  log_fail:
+    ;#far
+    ; prints a [fail] log then prints the string at [r9]
+    ; prints a newline
+ 
+    push r9
+    mov r9, LOG_TEXT_FAIL
+    call kprint
+    call space
+ 
+    mov r9, LOG_TEXT_COLOR
+    call kprint
+ 
+    pop r9
+    call kprint
+    call newline
+ 
+    mov r9, CANCEL_COLOR
+    call kprint
+ 
+    ret
+
+
+; shoutout to claude for generating us this
+; Murders bruattaly: r1-r6, r9
+print_hex_r0:
+  ;#far
+  mov r1, HEX_SCRATCH
+  mov [r1], 0x30       ; '0'
+  inc r1
+  mov [r1], 0x78       ; 'x'
+  inc r1               ; r1 now points at first hex digit slot
+ 
+  mov r2, r0            ; r2 = working copy of the value
+  mov r3, 4096           ; r3 = current divisor (starts at nibble 3, bits 12-15)
+ 
+hex_nibble_loop:
+  div r2, r3, r4        ; r4 = r2 / r3        (this nibble's value, 0-15)
+  mul r4, r3, r5        ; r5 = r4 * r3        (that nibble's place value)
+  sub r2, r5, r2        ; r2 = r2 - r5        (remove nibble from remainder)
+ 
+  ; look up ascii char for r4 in HEX_DIGITS table
+  mov r6, HEX_DIGITS
+  add r6, r4, r6         ; r6 = HEX_DIGITS + r4  (address of digit char)
+  mov r6, [r6]            ; r6 = the actual ascii char
+ 
+  mov [r1], r6
+  inc r1
+ 
+  ; move to next nibble: r3 = r3 / 16
+  mov r7, 16
+  div r3, r7, r3
+ 
+  mov r7, 0
+  cmp r3, r7
+  jne hex_nibble_loop
+ 
+  mov [r1], 0            ; null terminate "0xNNNN"
+ 
+  push r9                ; preserve caller's r9 (kprint/syscall clobbers it)
+  mov r9, HEX_SCRATCH
+  call kprint
+  pop r9
+ 
+  ret
+
+
+
+
+
+
+
+
+; SYSTEM CALLS ==================================================
+ 
+; Service that resolves syscalls
+%region 0x4000
+%defineword 0x9BA4
+%defineword 0x9BA4
+%defineword 0x4000
+%defineword "syscall service", 0
+ 
+error_syscall_isr:
+  clf         ; clear flags also resets the triple fault status
+  mov r5, r13 ; preserve error code
+ 
+  mov r0, VECTOR_SAVE
+  mov r13, [r0]
+ 
+  mov r9, LOG_TEXT_FAIL
+  call kprint
+  call space
+ 
+  mov r9, ERROR
+  call kprint
+ 
+  mov r0, r5
+  call print_hex_r0
+ 
+  call newline
+ 
+  jmp return_syscall
+ 
+  ERROR:
+    %defineword "syscall aborted: error ", 0
+ 
+error_syscall_verification_failed:
+  ; jumped to when a syscalls signauture is invalid
+ 
+ 
+  mov r9, ERROR_SYSCALL_VERIF_FAIL
+  call log_fail
+ 
+  clf ; clear flags
+  ret ; return to the caller without doing any syscall
+ 
+  ERROR_SYSCALL_VERIF_FAIL:
+    %defineword "syscall request aborted: syscall signature invalid", 0
+ 
+error_syscall_out_of_bounds:
+  ; jumped to when id is out of bounds (>255)
+ 
+  mov r9, ERROR_SYSCALL_OOB
+  call log_fail
+ 
+  clf ; clear flags
+  ret ; return to the caller without doing any syscall
+ 
+  ERROR_SYSCALL_OOB:
+    %defineword "syscall request aborted: syscall id out of bounds (>255)", 0
+ 
+; lets just hope this error doesnt happen to print otherwise we will log that a log failed to log... over and over again... oof.
+error_syscall_null_ptr:
+  ; jumped to when a syscall's pointer in the SDT resolves to null
+ 
+  mov r9, ERROR_NULL_SYSCALL_PTR
+  call log_fail
+ 
+  clf ; clear flags
+  ret ; return to the caller without doing any syscall
+ 
+  ; when a syscalls pointer is null
+  ERROR_NULL_SYSCALL_PTR:
+    %defineword "syscall request aborted: null pointer dereference in SDT lookup", 0
+ 
+syscall:
+  ;#far
+  ; -------------------------------
+  ; Kernel Syscall-invoking label
+  ; **Register Arguments:**
+  ; `r8: The syscall ID`
+  ; `r9-r12: Arguments for the invoked syscall`
+  ;
+  ; Will raise an error and abort the syscall **IF:**
+  ; The SDT entry is null
+  ; The function's signature is invalid
+  ; The id is out of bounds (>255)
+  ;
+  ; **The first address of the syscall is expected to be its signature `(0x9CCC)`**
+ 
+  ; -------------------------------------------------------------------------
+  ; Setup procedure
+  mov r0, 0x8000   ; syscall offset
+  add r8, r0, r8   ; turn syscall id into the address of the syscall's pointer
+ 
+  ; set the fault isr to the syscall error isr
+  mov [0x00FF], error_syscall_isr
+ 
+ 
+  ; -------------------------------------------------------------------------
+  ; Check bounds
+  mov r1, 0x80FF   ; where the syscall table ends
+  cmp r8, r1       ; make sure that syscall id is within the bounds of the SDT
+ 
+  jh error_syscall_out_of_bounds
+ 
+  ; -------------------------------------------------------------------------
+  ; Check if pointer is null
+  mov r0, [r8]     ; get the functions pointer
+  mov r1, 0
+  cmp r1, r0       ; make sure the pointer isn't zero, if so, then raise a error
+ 
+  je error_syscall_null_ptr
+ 
+  ; -------------------------------------------------------------------------
+  ; Check signature
+  mov r1, SYSCALL_SIG_VAL
+  mov r2, [r0]
+  cmp r2, r1
+ 
+  jne error_syscall_verification_failed
+ 
+  ; -------------------------------------------------------------------------
+  ; Jump
+ 
+  clf              ; clear flags
+  inc r0           ; increment the pointer by 1 to skip over the signature
+ 
+  call do_syscall  ; this jumps to mem[r0]
+                   ; return_syscall then returns here
+                   ; return_syscall will clear the flags and argument registers
+ 
+  ret              ; nothing left to do, return
+ 
+ 
+VECTOR_SAVE:
+  %defineword 0, 0, 0
+ 
+do_syscall:
+  ; The final stage of the syscall call
+  ; Expects r0 to hold the pointer of the syscall
+ 
+  ; save video cursor incase of error
+  mov r1, VECTOR_SAVE
+  mov [r1], r13
+ 
+  jptr r0
+ 
+;$$far
+  ; -------------------------------
+  ; Kernel return syscall function
+  ; **Register Arguments:**
+  ; `Takes no arguments.`
+  ;
+  ; *Restores fault vector then clears argument registers and flags, then returns to the original caller*
+  ;
+  ; If syscalls want to return values, they must use the stack by:
+  ; **1:** Popping the return pointer into a stratch register
+  ; **2:** Pushing the return value onto the stack
+  ; **3:** Pushing the original return pointer back onto the stack
+  ;
+  ; *The stack should end up looking something like this:*
+  ; **[Return Pointer], [Return Value]**
+return_syscall:
+ 
+ 
+  mov [0x00FF], PANIC_VECTOR_ADDRESS   ; restore panic ISR
+  call syscall_cleanup
+ 
+  clf   ; clear flags
+  ret   ; return to caller
+ 
+syscall_cleanup:
+  ; -------------------------------
+  ; **INTERNAL** Kernel syscall cleanup label
+  ; **Register Arguments:**
+  ; `Takes no arguments.`
+  ; Used to clear argument registers
+  ; Only to be called from return_syscall
+  sub r8, r8, r8
+  sub r9, r9, r9
+  sub r10, r10, r10
+  sub r11, r11, r11
+  sub r12, r12, r12
+ 
+  ret
+
+
+
+
+
+
+
+
+; SHELL =========================================================
+ 
+%region 0x5000
+%defineword 0x9BA4
+%defineword 0x9BA4
+%defineword 0x5000
+%defineword "shell code", 0
+
+
+SHELL_ENTP:
+; Shell code entrypoint address
+jmp shell
+
+
+; Emulator VGA colors:
+; 130: RED,
+; 131: GREEN
+; 132: BLUE
+; 133: BRIGHT_BLACK
+; 134: CYAN
+; 135: BG_RED
+; 136: RESET
+exit_str:
+  %defineword "exit", 0
+ 
+user_str:
+  %defineword 133, "user", 136, 0
+ 
+cursor_str:
+  %defineword 131, "/$ ", 136, 0
+ 
+print_current_com:
+ 
+  ; copy keyboard buffer to 0xB000
+  mov r9, 0xF000
+  mov r10, 155
+  mov r11, 0xB000
+  mov r8, ID_SYSCALL_MEMCPY
+  call syscall
+ 
+  ; print copied buffer
+  mov r9, 0xB000
+  call kprint
+ 
+  ; erase buffer
+  mov r9, 0xB000
+  mov r10, 155
+  mov r8, ID_SYSCALL_MEMCLR
+  call syscall
+  ret
+ 
+RETURN_ADDR_CHECK_COM:
+  %defineword 0
+ 
+check_com:
+  ; uses strcmp
+  ; expects:
+  ; - r9  = string A
+  ; - r10 = string B
+  ; - r7  = result
+ 
+  mov r11, RETURN_ADDR_CHECK_COM ; return value address for strcmp
+  mov r8, ID_SYSCALL_STRCMP
+  call syscall
+ 
+  mov r0, RETURN_ADDR_CHECK_COM
+  mov r7, [r0]
+ 
+  ret
+ 
+command_done:
+  ; Jump here when your command's code is finished
+  ; Clears scratch registers and returns to the shell
+ 
+  sub r0, r0, r0
+  sub r1, r1, r1
+  sub r2, r2, r2
+  sub r3, r3, r3
+  sub r4, r4, r4
+  sub r5, r5, r5
+  sub r6, r6, r6
+  sub r7, r7, r7
+ 
+  jmp shell
+ 
+wait_enter_pressed_backspace:
+  ; if the user pressed backspace but the keyboard buffer is empty, do nothing
+  mov r1, KBUF_CURSOR
+  mov r0, KBUF
+ 
+  cmp r1, r0
+  je wait_enter_pressed
+ 
+  dec r13
+  mov [r13], 0
+  vout
+ 
+  jmp wait_enter_pressed
+ 
+ 
+wait_enter_pressed:
+  mov r0, KBUF_CURSOR
+  mov r6, [r0]          ; read it into r6 as last for backspace detection
+ 
+  ehi
+  shlt ; wait for hwi
+  dhi
+ 
+  mov r0, KBUF_CURSOR
+  mov r1, [r0]
+ 
+  dec r1
+ 
+  mov r2, [r1]
+ 
+  mov r3, 13
+ 
+  cmp r3, r2
+  je c_ready
+  clf
+ 
+  ; the bios automatically decreases the cursor and writes a 0 to the buffer upon a backspace
+  ; we can still detect backspaces via seeing if the cursor went down
+ 
+  mov r7, KBUF_CURSOR
+  mov r5, [r7]
+  cmp r5, r6
+  jl wait_enter_pressed_backspace
+ 
+  mov [r13], r2
+ 
+  vout
+ 
+  inc r13
+ 
+  jmp wait_enter_pressed
+ 
+ 
+ 
+shell:
+  ; main shell thing yes
+ 
+ 
+  ; clear keyboard buffer.
+  int 0x01
+ 
+  ; print cursor
+  mov r9, user_str
+  call kprint
+  mov r9, cursor_str
+  call kprint
+ 
+  ; clear flags
+  clf
+ 
+  ; get input and print the command written
+ 
+  call wait_enter_pressed
+ 
+  c_ready:
+ 
+  ; remove the enter key
+  mov r1, KBUF_CURSOR
+  mov r0, [r1]
+  dec r0
+ 
+  mov [r0], 0
+ 
+  mov r0, [r1]
+ 
+  call newline
+ 
+  ; if nothing was entered, restart (if first keyboard buffer byte is 0)
+  mov r0, [0xF000]
+  mov r1, 0
+  cmp r0, r1
+  je shell
+  ;---
+ 
+  ; HELP
+  mov r10, KBUF
+ 
+  mov r9, str_help
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je help_command
+  ;---
+ 
+  ; ECHO
+  mov r10, KBUF
+ 
+  mov r9, str_echo
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je echo_command
+  ;---
+ 
+  ; PS
+  mov r10, KBUF
+ 
+  mov r9, str_ps
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je ps_command
+  ;---
+ 
+  ; CLEAR
+  mov r10, KBUF
+ 
+  mov r9, str_clear
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je clear_command
+  ;---
+ 
+  ; PANIC
+  mov r10, KBUF
+ 
+  mov r9, str_panic
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je panic_command
+  ;---
+ 
+  ; INSTALL
+  mov r10, KBUF
+ 
+  mov r9, str_install
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je install_commmand
+  ;---
+ 
+  ; EXIT
+  mov r10, KBUF
+ 
+  mov r9, str_exit
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je exit_command
+  ;---
+ 
+  ; REBOOT
+  mov r10, KBUF
+ 
+  mov r9, str_reboot
+  call check_com
+  mov r0, 1
+  cmp r0, r7
+ 
+  je reboot_command
+  ;---
+
+
+  ; invalid command
+  call invalid_command
+ 
+  ; loop back
+  jmp shell
+ 
+invalid_command:
+  mov r9, INVALID_COMMAND_STR
+  call kprint
+ 
+  call print_current_com
+ 
+  call newline
+ 
+  ret
+ 
+  INVALID_COMMAND_STR:
+    %defineword "Invalid command: ", 0
+ 
+str_help:
+  %defineword "help", 0
+ 
+str_echo:
+  %defineword "echo", 32
+ 
+str_ps:
+  %defineword "ps", 0
+ 
+str_clear:
+  %defineword "clear", 0
+ 
+str_panic:
+  %defineword "panic", 0
+ 
+str_install:
+  %defineword "install", 0  
+ 
+str_exit:
+  %defineword "exit", 0
+ 
+str_reboot:
+  %defineword "reboot", 0
+ 
+ 
+help_command:
+  mov r9, HELP_MAIN_STRING
+  call kprint
+  call newline
+ 
+  jmp command_done
+ 
+  HELP_MAIN_STRING:
+    %defineword "Command List:", 10
+    %defineword "help     | print this menu", 10
+    %defineword "echo     | echo text back to the terminal", 10
+    %defineword "ps       | list running processes and services", 10
+    %defineword "clear    | clear the screen", 10
+    %defineword "panic    | raise a kernel panic", 10
+    %defineword "install  | install ahoxos to disk", 10
+    %defineword "exit     | exit ahoxos", 10
+    %defineword "reboot   | reboot the system"
+ 
+    ; terminator
+    %defineword 0
+ 
+echo_command:
+  mov r0, KBUF
+ 
+  mov r1, 5  
+  add r0, r1, r0    ; skip 'echo ' text
+ 
+  mov r9, r0
+  call kprint       ; print text infront
+  call newline
+ 
+  jmp command_done
+ 
+ps_command:
+  call print_process_table
+ 
+  jmp command_done
+ 
+clear_command:
+  int 0x02
+  mov r13, VGA_START
+ 
+  jmp command_done
+ 
+panic_command:
+  mov r13, 0xDEAD
+  movfs r14, rIP
+ 
+  jmp raise_kernel_panic ; we are not coming back.
+ 
+install_commmand:
+ 
+  call install_commmand_install_stage
+ 
+  mov r9, installed_str
+  call log_ok
+ 
+  jmp command_done
+ 
+  installed_str:
+    %defineword "Installed AhoxOS to disk", 0
+ 
+install_commmand_install_stage:
+  mov r4, 0x0000  
+  mov r3, 0xEFFD
+ 
+install_commmand_loop:
+ 
+  dhi
+ 
+  cmp r4, r3
+  je install_commmand_end
+ 
+  mov r2, [r4]      
+  mov r0, r4          
+  mov r1, r2        
+  int 0x11
+ 
+  dhi
+ 
+  inc r4            
+  jmp install_commmand_loop
+ 
+install_commmand_end:
+  ehi
+  clf
+  ret
+ 
+exit_command:
+  hlt
+  jmp exit_command ; you are 101% not getting here but its here just in case
+ 
+reboot_command:
+  int 0x12
+ 
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; STRINGS
+; SPECIFICALLY MEANT TO STORE COMPLEX SINGULAR WORDS
+; IF YOUR PROGRAM ONLY NEEDS TO PRINT A SENTENCE, JUST EMBED THAT TEXT INTO THE PROGRAM AND PRINT IT LIKE THAT
+; DO NOT RELY ON JUST THESE WORDS!
+%region 0x7000
+; program table
+%defineword 0x9BA4
+%defineword 0x9BA4
+; entrypoint
+%defineword 0x7000
+; string name
+%defineword "data pool", 0
+ 
+; Emulator VGA colors:
+; 130: RED,
+; 131: GREEN
+; 132: BLUE
+; 133: BRIGHT_BLACK
+; 134: CYAN
+; 135: BG_RED
+; 136: RESET
+ 
+OS_KERNEL_VERSION:
+  %defineword "2026.08", 0
+ 
+OS_STRING_NAME:
+  %defineword "AhoxOS Kernel", 0
+ 
+SPACE_CHAR:
+  %defineword 32, 0
+ 
+NEWLINE_CHAR:
+  %defineword 10, 0
+ 
+LOG_TEXT_OK:
+  %defineword "[", 131, 32, "OK", 136, 32, "]", 0
+ 
+LOG_TEXT_WARN:
+  %defineword "[", 130, "WARN", 136, "]", 0
+ 
+LOG_TEXT_FAIL:
+  %defineword "[", 135, "FAIL", 136, "]", 0
+; =============
+; hex digit lookup table, indexed 0-15
+HEX_DIGITS:
+  %defineword 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46
+ 
+; scratch buffer for building "0xNNNN\0" (7 bytes)
+%region 0x0900
+; Place it very early in memory almost inside the BIOS region so nothing else will touch it in the future
+HEX_SCRATCH:
+  %defineword 0, 0, 0, 0, 0, 0, 0
+
+
+
+; FUNCTION CODE LIVES AT 0x8100-0x8FFF - FUNCTION DISPATCH TABLE LIVES AT 0x8000
+; THE SDT (SYSCALL DISPATCH TABLE) IS A FLAT LIST OF 255 POINTERS
+%region 0x8100
+; program table
+%defineword 0x9BA4
+%defineword 0x9BA4
+; entrypoint
+%defineword 0x8100
+; string name
+%defineword "syscalls", 0
+ 
+; ==================
+SYSCALL_PRINT:
+; Pointer to the print syscall
+%defineword 0x9CCC
+; PRINT STRING
+; Uses r13 as a cursor
+; syscall id 1
+; r9 is the location of the string
+; writes the string bytes into the address in r13 (r13 is the screen cursor)
+print_func:
+  mov r0, 0      ; CONST NULL TERMINATOR
+  mov r1, 0xFFFF ; CONST END
+  mov r2, 0      ; VAR CURRENT
+  jmp write_bytes
+ 
+write_bytes:
+  ; check for cursor overflow
+  cmp r1, r13
+  je overflow
+ 
+  ; read byte  
+  mov r2, [r9]
+ 
+  ; compare byte to 0
+  cmp r2, r0
+  je end
+ 
+  ; move byte
+  mov [r13], r2
+ 
+  ; increment pointers
+  inc r13   ; increment cursor
+  inc r9    ; increment string pointer
+  jmp write_bytes
+ 
+end:
+  ; refresh display hardware and return from syscall
+ 
+  vout
+  jmp return_syscall
+ 
+overflow:
+  ; occours when screen cursor goes over 0xFFFF
+ 
+  int 0x02            ; clear the screen
+  mov r13, VGA_START  ; reset the cursor
+  jmp end             ; end early
+ 
+; ==================
+SYSCALL_LEN:
+; Pointer to the len syscall
+%defineword 0x9CCC
+; LENGTH
+; Uses r9 as the address to count
+; Return value is stored in the stack
+; Will preserve the return address for return_syscall
+; syscall id 2
+; Wanders through [r9] incrementing r4/r9 until it hits [0]
+; Asumes it will not hit 0xFFFF
+len_func:
+  mov r0, 0   ; CONST NULL TERMINATOR
+  mov r4, 0   ; VAR LENGTH (RETURN)
+  mov r1, 0   ; VAR CURRENT
+  jmp len_loop
+ 
+len_loop:
+  ; compare 0
+  mov r1, [r9]
+  cmp r0, r1
+  je len_finish
+ 
+  ; increment
+  inc r4
+  inc r9
+  jmp len_loop
+ 
+len_finish:
+  pop r0  ; return address now in r0
+  push r4 ; return value now in stack
+  push r0 ; push return address back to the top
+  ; stack becomes something like:
+  ; [return address], [value]
+ 
+  jmp return_syscall
+SYSCALL_MEMCPY:
+; Pointer to the copy memory syscall
+%defineword 0x9CCC
+; COPY MEMORY
+; Args
+;  r9  = address to copy (used as pointer)
+;  r10 = bytes to copy (converted to terminator address)
+;  r11 = where to copy to (used as pointer)
+; these are supposed to be arg-only registers but this is simple and wont cause issues
+; Assumes it will not hit 0xFFFF
+memcpy_func:
+  ; r9 can be re-used as the copy pointer
+  ; r10 can be used as a limit address
+  add r9, r10, r10 ; set the limit (limit = read_address + bytes_to_read)
+  mov r0, 0        ; VAR CURRENT
+  ; r11 can be re-used as the copy where pointer
+  jmp memcpy_func_read_loop
+ 
+memcpy_func_read_loop:
+  ; check if we have hit the end
+  cmp r9, r10
+  jh memcpy_func_end
+ 
+  ; read current pointer from where to read
+  mov r0, [r9]
+ 
+  ; write that byte into the address to copy to
+  mov [r11], r0
+ 
+  ; increment both pointers
+  inc r9
+  inc r11
+ 
+  ; jump back to the start of the loop
+  jmp memcpy_func_read_loop
+ 
+ 
+memcpy_func_end:
+  jmp return_syscall
+ 
+SYSCALL_MEMCLR:
+; pointer to the clear memory syscall
+%defineword 0x9CCC
+; clears a block of memory (duh)
+; args:
+; r9  = the address (also used as pointer)
+; r10 = amount of bytes to clear (turned into end address using addition)
+; these are supposed to be arg-only registers but this is simple and wont cause issues
+memclr_func:
+  add r9, r10, r10           ; end address = base address + amount of bytes to clear
+ 
+  jmp memclr_func_write_loop
+ 
+memclr_func_write_loop:
+  ; compare to end address
+  cmp r9, r10
+  jh memclr_func_end
+ 
+  ; write 0 to current pointer
+  mov [r9], 0
+ 
+  ; increment pointer
+  inc r9
+ 
+  ; repeat
+  jmp memclr_func_write_loop
+ 
+memclr_func_end:
+  jmp return_syscall
+ 
+SYSCALL_STRCMP:
+; pointer to the compare string syscall
+%defineword 0x9CCC
+; STRING COMPARE
+; Arguments:
+;  r10 = string A address
+;  r9 = string B address
+;  result pushed to stack
+;  terminates on both 0 and space
+ 
+func_strcmp:
+  mov r0, 32 ; CONST SPACE
+  mov r1, 0  ; CONST NULL
+ 
+  mov r2, 0  ; VAR CURRENT A
+  mov r3, 0  ; VAR CURRENT B
+ 
+func_strcmp_compare:
+  mov r2, [r9]
+  mov r3, [r10]
+ 
+  cmp r2, r3
+  jne func_strcmp_wrong
+  jmp func_strcmp_compare_term
+ 
+func_strcmp_compare_term:
+  cmp r2, r0
+  je func_strcmp_compare_term2
+ 
+  cmp r2, r1
+  je func_strcmp_compare_term2
+ 
+  inc r9
+  inc r10
+ 
+  jmp func_strcmp_compare
+ 
+func_strcmp_compare_term2:
+  cmp r3, r0
+  je func_strcmp_same
+ 
+  cmp r3, r1
+  je func_strcmp_same
+ 
+  jmp func_strcmp_wrong
+ 
+ 
+func_strcmp_same:
+  mov [r11], 1
+  jmp func_strcmp_done
+ 
+func_strcmp_wrong:
+  mov [r11], 0
+  jmp func_strcmp_done
+ 
+func_strcmp_done:
+  jmp return_syscall
+   
+; The amount of newlines inbetween here and syscall represent the amount of times i pressed enter and backspace trying to figure out how to build a syscall
+; dont be surprised if this ends up on line 30000
+PROCESS_REGION_END:
+
+
+; MARKERS
+%region 0xF100
+VGA_START:
+%region 0xE000
+STACK_BASE_ADDRESS:
+%region 0x0001
+ID_SYSCALL_PRINT:
+%region 0x0002
+ID_SYSCALL_LEN_MEM:
+%region 0x9CCC
+SYSCALL_SIG_VAL:
+%region 0x0003
+ID_SYSCALL_MEMCPY:
+%region 0x0004
+ID_SYSCALL_MEMCLR:
+%region 0x9BA4
+PROCESS_MAGIC:
+%region 0x0005
+ID_SYSCALL_STRCMP:
+%region 0xF000
+KBUF:
+%region 155
+KBUF_SIZE:
+%region 0xEFFF
+KBUF_CURSOR:
+
+
+
+
+
+; Set by emulator:
+;  r13 = error code
+;  r14 = faulting address
+; EHC (Error Handling Code)
+; This is where the 0xFF error IVT vector points to
+%region 0xA000
+PANIC_VECTOR_ADDRESS:
+; takes:
+; r13, r14 as error operands (see above)
+; this will halt the CPU and end all execution
+; there is no returning from here.
+; uses the crappiest and most dismal dumb way to write text, it just uses the LOAD opcode (copy these bytes to a new address) and then moves on
+; uses a find-end system to write, does not use the cursor in r13
+  ; -------------------------------
+  ; **Kernel panic routine**
+  ; **Register Arguments:**
+  ; `r13: error code`
+  ; `r14: faulting address`
+  ;
+  ; Prints debug information in the dumbest way possible, then halts
+  ; **There is no coming back from here**
+raise_kernel_panic:
+ 
+  mov r0, secondary_error_isr
+  mov [0x00FF], r0               ; so if another error occours, then just halt the CPU
+ 
+  clf                            ; clear fault status
+ 
+  call panic_newline
+  call color_red_bg
+  load r4, "kernel panic:"
+  call no_color
+  call panic_newline
+  load r4, "Generating crash dump ..."
+  vout
+  call panic_newline
+  load r4, "error:"
+  call panic_space
+  mov r0, r13
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "address:"
+  call panic_space
+ 
+  mov r0, r14
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R0:"
+  call panic_space
+  mov r0, r0
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R1:"
+  call panic_space
+  mov r0, r1
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R2:"
+  call panic_space
+  mov r0, r2
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R3:"
+  call panic_space
+  mov r0, r3
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R4:"
+  call panic_space
+  mov r0, r4
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R5:"
+  call panic_space
+  mov r0, r5
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R6:"
+  call panic_space
+  mov r0, r6
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R7:"
+  call panic_space
+  mov r0, r7
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R8:"
+  call panic_space
+  mov r0, r8
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R9:"
+  call panic_space
+  mov r0, r9
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R10:"
+  call panic_space
+  mov r0, r10
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R11:"
+  call panic_space
+  mov r0, r11
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R12:"
+  call panic_space
+  mov r0, r12
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R13:"
+  call panic_space
+  mov r0, r13
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "R14:"
+  call panic_space
+  mov r0, r14
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "R15:"
+  call panic_space
+  mov r0, r15
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  load r4, "rIP:"
+  call panic_space
+  movfs r0, rIP
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "rSP:"
+  call panic_space
+  movfs r0, rSP
+  call panic_print_hex_r0
+  call panic_space
+ 
+  load r4, "rFLAGS:"
+  call panic_space
+  movfs r0, rFLAGS
+  call panic_print_hex_r0
+  call panic_newline
+ 
+  call panic_newline
+ 
+  load r4, "Generating fault segment ..."
+  call panic_newline
+  vout
+  load r4, "Faulting segment:"
+  call panic_newline
+  call panic_print_code_segment
+ 
+  vout
+ 
+  call panic_newline
+  call panic_newline
+ 
+  load r4, "Call Trace:"
+  call panic_newline
+  ; loop through and print every stack value until we hit 0
+  call panic_print_call_stack
+ 
+  vout
+  hlt ; end the choas
+ 
+color_red_bg:
+  mov r5, VGA_START
+ 
+  call get_next
+  add r5, r4, r4
+  mov [r4], 135
+  call get_next
+  add r5, r4, r4
+  ret
+ 
+no_color:
+  mov r5, VGA_START
+ 
+  call get_next
+  add r5, r4, r4
+  mov [r4], 136
+  call get_next
+  add r5, r4, r4
+  ret
+ 
+panic_newline:
+  mov r5, VGA_START
+  call get_next
+  add r5, r4, r4
+  mov [r4], 10
+  call get_next
+  add r5, r4, r4
+  ret
+ 
+panic_space:
+  mov r5, VGA_START
+  call get_next
+  add r5, r4, r4
+  mov [r4], 32
+  call get_next
+  add r5, r4, r4
+  ret
+ 
+secondary_error_isr:
+  hlt
+  jmp secondary_error_isr
+ 
+ ; gets the length of vga mem
+  ; add result by 0xF100 to get the next free address
+  ; Does NOT clobber r0
+  ; Assumes it will not hit 0xFFFF
+get_next:
+ 
+  mov r1, VGA_START  ; VAR POINTER
+  mov r4, 0          ; VAR LENGTH (RETURN)
+  mov r2, 0          ; VAR CURRENT
+  mov r3, 0          ; CONST NULL TERMINATOR
+  jmp get_next_read_loop
+ 
+get_next_read_loop:
+  mov r2, [r1]
+  cmp r3, r2
+  je get_next_end
+ 
+  inc r1
+  inc r4
+  jmp get_next_read_loop
+ 
+ 
+ 
+get_next_end:
+  clf
+  ret
+ 
+panic_print_code_segment:
+  ; Prints the raw bytes in hex from  back 50 - rIP + 50 forward
+  ; prints `-><-` at the exact byte that the fault occoured
+  ; Slimes out r14
+  ; does not touch the stack
+  mov r9, r14               ; r9 now stores the exact address at which the fault occoured
+ 
+  mov r0, 10
+  add r0, r14, r5           ; set r5 to 10 words infront of the fault
+ 
+  mov r0, 10
+  sub r14, r0, r14          ; set r14 to 10 words before the fault
+ 
+  push r14
+  push r9
+  push r5
+  push r0
+ 
+  load r4, "-["
+  mov r0, r14
+  call panic_print_hex_r0
+  call get_next
+  mov r10, 0xF100
+  add r4, r10, r4
+  load r4, "]"
+  call panic_space
+ 
+  pop r0
+  pop r5
+  pop r9
+  pop r14
+ 
+  jmp panic_print_code_segment_loop
+ 
+panic_print_code_segment_loop:
+  ; check for end
+  cmp r14, r5
+  je panic_print_code_segment_end
+ 
+  cmp r9, r14
+  je panic_print_code_segment_fault_addr_found
+ 
+  ; default: just print the byte
+ 
+  mov r0, [r14]
+  push r14
+  push r9
+  push r5
+  push r0
+ 
+  call panic_print_hex_r0
+  call panic_space
+ 
+  pop r0
+  pop r5
+  pop r9
+  pop r14
+ 
+  inc r14 ; then increment the cursor
+ 
+ 
+  ; repeat
+  jmp panic_print_code_segment_loop
+ 
+panic_print_code_segment_fault_addr_found:
+  ; preserve
+  push r14
+  push r9
+  push r5
+  push r0
+ 
+  ;---
+ 
+  call panic_space
+  load r4, "->"
+  call panic_space
+  mov r0, [r14]
+  call panic_print_hex_r0
+  call panic_space
+  call panic_space
+  load r4, "<-"
+  call panic_space
+ 
+  pop r0
+  pop r5
+  pop r9
+  pop r14
+  inc r14
+  jmp panic_print_code_segment_loop
+ 
+ 
+panic_print_code_segment_end:
+  load r4, "+["
+  mov r0, r14
+  call panic_print_hex_r0
+  call get_next
+  mov r10, 0xF100
+  add r4, r10, r4
+  load r4, "]"
+  call panic_space
+ 
+ 
+ 
+  call panic_newline
+  ret  
+
+
+; SHOUTOUT TO CLAUDE FOR THE STACK PRINT CODE
+panic_stack_write_str:
+  ; -------------------------------
+  ; INTERNAL helper: appends the string whose address is in r9
+  ; to the end of VGA memory, panic-style (find-end + direct write,
+  ; NOT syscall kprint, since this must be safe mid-panic).
+  ; Clobbers: r0, r1, r4, r5
+  call get_next
+  mov r5, VGA_START
+  add r5, r4, r5      ; r5 = next free VGA address
+  mov r0, 0           ; CONST NULL TERMINATOR
+ 
+panic_stack_write_str_loop:
+  mov r1, [r9]
+  cmp r1, r0
+  je panic_stack_write_str_end
+  mov [r5], r1
+  inc r5
+  inc r9
+  jmp panic_stack_write_str_loop
+ 
+panic_stack_write_str_end:
+  ret
+ 
+panic_print_call_stack:
+  mov r14, 0
+  pop r14                                   ; preserve caller's return address
+ 
+panic_print_call_stack_read_loop:
+  pop r1                                    ; r1 = next raw stack word
+  mov r8, 0
+  cmp r1, r8
+  je panic_print_call_stack_compare_end     ; terminator hit, done
+ 
+  ; ---- find nearest label at-or-below r1 ----
+  mov r5, 0xFFFF     ; VAR lowest_diff
+  mov r6, 0xFFFF     ; VAR best_index (0xFFFF = none matched)
+  mov r4, 0          ; VAR candidate index
+  push r1            ; r1 gets clobbered by the try-label helper, save it
+ 
+  mov r0, kern_start
+  call panic_stack_try_label
+  mov r0, syscall
+  call panic_stack_try_label
+  mov r0, return_syscall
+  call panic_stack_try_label
+  mov r0, syscall_cleanup
+  call panic_stack_try_label
+  mov r0, init_syscall
+  call panic_stack_try_label
+  mov r0, kprint
+  call panic_stack_try_label
+  mov r0, log_ok
+  call panic_stack_try_label
+  mov r0, log_fail
+  call panic_stack_try_label
+  mov r0, log_warn
+  call panic_stack_try_label
+  mov r0, newline
+  call panic_stack_try_label    
+  mov r0, init_vector_trap
+  call panic_stack_try_label
+ 
+  pop r1             ; restore raw stack word for printing
+  ; r5 = winning diff, r6 = winning index (0xFFFF if nothing matched)
+  ; panic_print_hex_r0 clobbers r1-r7, so both of these (and r1 itself)
+  ; must be saved on the stack before the first hex-print call below.
+  push r5
+  push r6
+  push r1
+ 
+  ; ---- print "[" ----
+  mov r5, VGA_START
+  call get_next
+  add r5, r4, r5
+  load r5, "["
+ 
+  ; ---- print hex of the raw stack value ----
+  pop r0             ; r0 = raw stack word (was r1)
+  call panic_print_hex_r0
+ 
+  ; ---- print "] " ----
+  mov r5, VGA_START
+  call get_next
+  add r5, r4, r5
+  load r5, "] "
+ 
+  pop r6             ; restore winning index
+  pop r5             ; restore winning diff (offset)
+ 
+  ; ---- dispatch on r6 to print the label name ----
+  mov r2, 0
+  cmp r6, r2
+  je panic_stack_name_0
+  mov r2, 1
+  cmp r6, r2
+  je panic_stack_name_1
+  mov r2, 2
+  cmp r6, r2
+  je panic_stack_name_2
+  mov r2, 3
+  cmp r6, r2
+  je panic_stack_name_3
+  mov r2, 4
+  cmp r6, r2
+  je panic_stack_name_4
+  mov r2, 5
+  cmp r6, r2
+  je panic_stack_name_5
+  mov r2, 6
+  cmp r6, r2
+  je panic_stack_name_6
+  mov r2, 7
+  cmp r6, r2
+  je panic_stack_name_7
+  mov r2, 8
+  cmp r6, r2
+  je panic_stack_name_8
+  mov r2, 9
+  cmp r6, r2
+  je panic_stack_name_9
+  mov r2, 10
+  cmp r6, r2
+  je panic_stack_name_10
+  jmp panic_stack_name_unknown
+ 
+panic_stack_name_0:
+  mov r9, PANIC_NAME_KERN_START
+  jmp panic_stack_print_name
+panic_stack_name_1:
+  mov r9, PANIC_NAME_SYSCALL
+  jmp panic_stack_print_name
+panic_stack_name_2:
+  mov r9, PANIC_NAME_RETURN_SYSCALL
+  jmp panic_stack_print_name
+panic_stack_name_3:
+  mov r9, PANIC_NAME_SYSCALL_CLEANUP
+  jmp panic_stack_print_name
+panic_stack_name_4:
+  mov r9, PANIC_NAME_INIT_SYSCALL
+  jmp panic_stack_print_name
+panic_stack_name_5:
+  mov r9, PANIC_NAME_KPRINT
+  jmp panic_stack_print_name
+panic_stack_name_6:
+  mov r9, PANIC_NAME_LOG_OK
+  jmp panic_stack_print_name
+panic_stack_name_7:
+  mov r9, PANIC_NAME_LOG_FAIL
+  jmp panic_stack_print_name
+panic_stack_name_8:
+  mov r9, PANIC_NAME_LOG_WARN
+  jmp panic_stack_print_name
+panic_stack_name_9:
+  mov r9, PANIC_NAME_NEWLINE
+  jmp panic_stack_print_name
+panic_stack_name_10:
+  mov r9, PANIC_NAME_VECTOR_TRAP
+  jmp panic_stack_print_name
+panic_stack_name_unknown:
+  mov r9, PANIC_NAME_UNKNOWN
+  mov r5, 0          ; nothing matched, print +0x0000 rather than garbage
+ 
+panic_stack_print_name:
+  push r5            ; panic_stack_write_str clobbers r5, save the offset first
+  call panic_stack_write_str
+  pop r5
+ 
+  ; ---- print "/+" ----
+  push r5            ; the VGA-append block below also clobbers r5
+  mov r5, VGA_START
+  call get_next
+  add r5, r4, r5
+  load r5, "/+"
+  pop r5
+ 
+  ; ---- print hex of offset ----
+  mov r0, r5
+  call panic_print_hex_r0
+ 
+  ; ---- print " Words" ----
+  mov r5, VGA_START
+  call get_next
+ 
+  call panic_newline
+  jmp panic_print_call_stack_read_loop
+ 
+panic_stack_try_label:
+  ; in:  r0 = candidate label address, r1 = stack value, r4 = candidate index
+  ;      r5 = current lowest_diff, r6 = current best_index
+  ; out: r5, r6 possibly updated; r4 incremented; returns to caller
+  sub r1, r0, r2        ; r2 = r1 - r0 (wraps large if r0 > r1, naturally excluded below)
+  cmp r2, r5
+  jh panic_stack_try_label_skip
+  je panic_stack_try_label_skip   ; keep first (stable) match on ties
+  mov r5, r2
+  mov r6, r4
+ 
+panic_stack_try_label_skip:
+  inc r4
+  ret
+ 
+panic_print_call_stack_compare_end:
+  push r14
+  ret
+ 
+; ---- label name strings for the stack trace printer ----
+PANIC_NAME_KERN_START:
+  %defineword "kern_start", 0
+PANIC_NAME_SYSCALL:
+  %defineword "syscall", 0
+PANIC_NAME_RETURN_SYSCALL:
+  %defineword "return_syscall", 0
+PANIC_NAME_SYSCALL_CLEANUP:
+  %defineword "syscall_cleanup", 0
+PANIC_NAME_INIT_SYSCALL:
+  %defineword "init_syscall", 0
+PANIC_NAME_KPRINT:
+  %defineword "kprint", 0
+PANIC_NAME_LOG_OK:
+  %defineword "log_ok", 0
+PANIC_NAME_LOG_FAIL:
+  %defineword "log_fail", 0
+PANIC_NAME_LOG_WARN:
+  %defineword "log_warn", 0
+PANIC_NAME_UNKNOWN:
+  %defineword "unknown", 0
+PANIC_NAME_NEWLINE:
+  %defineword "newline", 0
+PANIC_NAME_VECTOR_TRAP:
+  %defineword "init_vector_trap", 0
+ 
+ 
+ 
+; shoutout to claude
+panic_print_hex_r0:
+  ; -------------------------------
+  ; Barebones hex printer for the panic routine
+  ; **Register Arguments:**
+  ; `r0: value to print`
+  ;
+  ; Appends "0xNNNN" directly to the end of VGA memory using the same
+  ; find-end + LOAD pattern as the rest of raise_kernel_panic.
+  ; Does NOT use kprint/syscall (may not be safe/alive during a panic).
+  ; Clobbers: r1-r7
+ 
+  mov r2, r0             ; r2 = working copy of the value
+  mov r3, 4096            ; r3 = current divisor (starts at nibble 3, bits 12-15)
+ 
+  ; build "0xNNNN" into HEX_SCRATCH first
+  mov r1, HEX_SCRATCH
+  mov [r1], 0x30          ; '0'
+  inc r1
+  mov [r1], 0x78          ; 'x'
+  inc r1
+ 
+panic_hex_nibble_loop:
+  div r2, r3, r4         ; r4 = r2 / r3
+  mul r4, r3, r5         ; r5 = r4 * r3
+  sub r2, r5, r2         ; r2 = r2 - r5
+ 
+  mov r6, HEX_DIGITS
+  add r6, r4, r6          ; r6 = HEX_DIGITS + r4
+  mov r6, [r6]
+ 
+  mov [r1], r6
+  inc r1
+ 
+  mov r7, 16
+  div r3, r7, r3
+ 
+  mov r7, 0
+  cmp r3, r7
+  jne panic_hex_nibble_loop
+ 
+  mov [r1], 0             ; null terminate "0xNNNN"
+ 
+  ; now append HEX_SCRATCH onto the end of VGA memory, panic-style
+  call get_next
+  mov r5, VGA_START
+  add r5, r4, r5           ; r5 = next free VGA address
+ 
+  mov r1, HEX_SCRATCH
+  mov r7, 0                ; CONST NULL TERMINATOR (register form for cmp)
+ 
+panic_hex_write_loop:
+  mov r2, [r1]
+  cmp r2, r7
+  je panic_hex_write_end
+ 
+  mov [r5], r2
+  inc r5
+  inc r1
+  jmp panic_hex_write_loop
+ 
+panic_hex_write_end:  
+  ret

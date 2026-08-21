@@ -1,0 +1,71 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "VSK-E16A Assembly",
+  "scopeName": "source.xasm16a",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#labels" },
+    { "include": "#directives" },
+    { "include": "#strings" },
+    { "include": "#registers" },
+    { "include": "#numbers" },
+    { "include": "#opcodes" },
+    { "include": "#label-refs" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.semicolon.xasm16a", "match": ";.*$" }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "comment": "label definitions may be namespaced with dots, e.g. interrupts.clear_kbuf:",
+          "name": "entity.name.function.label.xasm16a",
+          "match": "^\\s*[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*(?=:)"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        { "name": "keyword.control.directive.xasm16a", "match": "%(region|defineword|str|asc)" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        { "name": "string.quoted.double.xasm16a", "begin": "\"", "end": "\"" },
+        { "name": "string.quoted.single.xasm16a", "begin": "'", "end": "'" }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "comment": "general purpose r0-r15, plus the MOVFS pseudo-register names",
+          "name": "variable.language.register.xasm16a support.variable.register.xasm16a",
+          "match": "\\b(r(1[0-5]|[0-9])|rFLAGS|rIP|rSP)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "name": "constant.numeric.hex.xasm16a", "match": "\\b0[xX][0-9a-fA-F]+\\b" },
+        { "name": "constant.numeric.decimal.xasm16a", "match": "\\b[0-9]+\\b" }
+      ]
+    },
+    "opcodes": {
+      "patterns": [
+        { "name": "keyword.control.opcode.xasm16a keyword.other.opcode.xasm16a", "match": "\\b(hlt|mov|vout|add|sub|mul|div|jmp|call|ret|push|pop|cmp|je|jne|dhi|load|inc|dec|nump|ehi|in|int|jh|jl|clf|jptr|movfs|movsp|out|shlt)\\b" }
+      ]
+    },
+    "label-refs": {
+      "patterns": [
+        {
+          "comment": "any bare identifier left over once opcodes/registers/numbers/directives have claimed their tokens is, by construction of this language, a label reference - whichever operand position it's in (mov dest/src, jmp/call/je/jne/jh/jl target, etc). Labels may be namespaced with dots, e.g. interrupts.clear_kbuf. Registers, opcodes and pseudo-registers are matched earlier in the pattern list so they never reach this rule.",
+          "name": "entity.name.function.label-ref.xasm16a",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*\\b(?!\\s*:)"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VSK-E16A Reference Manual — Rev 1.0</title>
+<style>
+  :root{
+    --bg:#0d1420;
+    --panel:#131c2b;
+    --panel2:#0a1119;
+    --border:#233047;
+    --fg:#dbe4f0;
+    --fg-dim:#7d8ba8;
+    --accent:#5b8def;
+    --accent2:#7fd88f;
+    --warn:#e0a458;
+    --danger:#e06868;
+    --mono:"Consolas","SF Mono","Courier New",monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:var(--sans);
+    line-height:1.55;
+  }
+  .wrap{
+    display:grid;
+    grid-template-columns:250px 1fr;
+    min-height:100vh;
+  }
+  nav{
+    background:var(--panel2);
+    border-right:1px solid var(--border);
+    padding:24px 0;
+    position:sticky;
+    top:0;
+    height:100vh;
+    overflow-y:auto;
+  }
+  nav .brand{
+    padding:0 20px 18px 20px;
+    border-bottom:1px solid var(--border);
+    margin-bottom:12px;
+  }
+  nav .brand .name{font-family:var(--mono);font-weight:700;font-size:1.05em;color:var(--fg);}
+  nav .brand .sub{font-size:0.75em;color:var(--fg-dim);margin-top:2px;}
+  nav .rev{
+    display:inline-block;
+    margin-top:8px;
+    font-size:0.7em;
+    color:var(--accent);
+    border:1px solid var(--accent);
+    border-radius:3px;
+    padding:2px 6px;
+    font-family:var(--mono);
+  }
+  nav ul{list-style:none;margin:0;padding:0;}
+  nav li a{
+    display:block;
+    padding:6px 20px;
+    color:var(--fg-dim);
+    text-decoration:none;
+    font-size:0.86em;
+    border-left:2px solid transparent;
+  }
+  nav li a:hover{color:var(--fg);border-left-color:var(--accent);background:rgba(91,141,239,0.06);}
+  nav .section-label{
+    padding:14px 20px 4px 20px;
+    font-size:0.7em;
+    letter-spacing:0.08em;
+    color:var(--accent);
+    text-transform:uppercase;
+  }
+  main{
+    padding:40px 56px 100px 56px;
+    max-width:900px;
+  }
+  h1{
+    font-family:var(--mono);
+    font-size:2em;
+    margin:0 0 4px 0;
+    color:var(--fg);
+  }
+  .tagline{color:var(--fg-dim);margin-bottom:6px;}
+  .meta-row{
+    display:flex;gap:16px;flex-wrap:wrap;
+    font-size:0.8em;color:var(--fg-dim);
+    margin-bottom:32px;
+    padding-bottom:20px;
+    border-bottom:1px solid var(--border);
+  }
+  .meta-row span b{color:var(--fg);}
+  h2{
+    font-family:var(--mono);
+    font-size:1.35em;
+    margin-top:56px;
+    padding-bottom:8px;
+    border-bottom:1px solid var(--border);
+    color:var(--fg);
+  }
+  h2 .num{color:var(--accent);margin-right:8px;}
+  h3{
+    font-family:var(--mono);
+    font-size:1.05em;
+    margin-top:32px;
+    color:var(--accent2);
+  }
+  p{color:var(--fg);}
+  code, .mono{font-family:var(--mono);}
+  code{
+    background:var(--panel2);
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:1px 6px;
+    font-size:0.92em;
+    color:var(--accent2);
+  }
+  pre{
+    background:var(--panel2);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:16px 18px;
+    overflow-x:auto;
+    font-size:0.86em;
+    line-height:1.6;
+  }
+  pre code{border:none;background:none;padding:0;color:var(--fg);}
+  .callout{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-left:3px solid var(--accent);
+    border-radius:6px;
+    padding:14px 18px;
+    margin:18px 0;
+    font-size:0.92em;
+  }
+  .callout.warn{border-left-color:var(--warn);}
+  .callout.danger{border-left-color:var(--danger);}
+  .callout .label{
+    font-family:var(--mono);
+    font-size:0.75em;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    color:var(--accent);
+    margin-bottom:6px;
+    display:block;
+  }
+  .callout.warn .label{color:var(--warn);}
+  .callout.danger .label{color:var(--danger);}
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin:18px 0;
+    font-size:0.88em;
+  }
+  th, td{
+    border:1px solid var(--border);
+    padding:8px 12px;
+    text-align:left;
+    vertical-align:top;
+  }
+  th{
+    background:var(--panel2);
+    color:var(--accent);
+    font-family:var(--mono);
+    font-weight:600;
+    font-size:0.85em;
+  }
+  tr:nth-child(even) td{background:rgba(255,255,255,0.015);}
+  td code{white-space:nowrap;}
+  .opcode-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:18px 22px;
+    margin:20px 0;
+  }
+  .opcode-card .head{
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+  }
+  .opcode-card .mnemonic{
+    font-family:var(--mono);
+    font-size:1.15em;
+    font-weight:700;
+    color:var(--accent2);
+  }
+  .badge{
+    font-family:var(--mono);
+    font-size:0.72em;
+    padding:2px 8px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    color:var(--fg-dim);
+  }
+  .badge.op{color:var(--accent);border-color:var(--accent);}
+  .badge.size{color:var(--warn);border-color:var(--warn);}
+  .opcode-card .encoding{
+    font-family:var(--mono);
+    font-size:0.85em;
+    color:var(--fg-dim);
+    background:var(--panel2);
+    border-radius:4px;
+    padding:8px 12px;
+    margin:10px 0;
+    overflow-x:auto;
+    white-space:nowrap;
+  }
+  .opcode-card .encoding .field{color:var(--fg);}
+  .opcode-card .desc{margin-top:8px;}
+  .flags-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:var(--mono);
+    font-size:0.78em;
+    color:var(--fg-dim);
+    margin-top:8px;
+  }
+  .flags-badge .fv{color:var(--fg);background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:1px 6px;}
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin:18px 0;
+  }
+  .mem-map-row{
+    display:flex;
+    align-items:center;
+    border:1px solid var(--border);
+    border-radius:6px;
+    overflow:hidden;
+    margin-bottom:6px;
+  }
+  .mem-map-row .addr{
+    font-family:var(--mono);
+    background:var(--panel2);
+    color:var(--accent);
+    padding:8px 14px;
+    font-size:0.85em;
+    min-width:150px;
+  }
+  .mem-map-row .label{
+    padding:8px 14px;
+    background:var(--panel);
+    font-size:0.9em;
+    flex:1;
+  }
+  ul.clean{padding-left:22px;}
+  ul.clean li{margin-bottom:6px;}
+  ol.clean{padding-left:22px;}
+  ol.clean li{margin-bottom:6px;}
+  .footer-note{
+    margin-top:70px;
+    padding-top:20px;
+    border-top:1px solid var(--border);
+    color:var(--fg-dim);
+    font-size:0.82em;
+  }
+  .step-flow{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    margin:20px 0;
+  }
+  .step-flow .step{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:10px 16px;
+    font-family:var(--mono);
+    font-size:0.85em;
+    color:var(--accent2);
+  }
+  .step-flow .arrow{color:var(--fg-dim);}
+  a.anchor-target{display:block;position:relative;top:-70px;visibility:hidden;}
+  .small{font-size:0.85em;color:var(--fg-dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <div class="brand">
+    <div class="name">VSK-E16A</div>
+    <div class="sub">Extended Virtual 16-bit Machine</div>
+    <div class="rev">REV 1.0</div>
+  </div>
+  <div class="section-label">Overview</div>
+  <ul>
+    <li><a href="#intro">1. Introduction</a></li>
+    <li><a href="#relation">2. Relation to VSK-16A</a></li>
+    <li><a href="#arch">3. Architecture</a></li>
+    <li><a href="#memmap">4. Memory Map</a></li>
+    <li><a href="#regs">5. Registers &amp; Flags</a></li>
+  </ul>
+  <div class="section-label">Programming</div>
+  <ul>
+    <li><a href="#addrmodes">6. Addressing Modes</a></li>
+    <li><a href="#isa">7. Instruction Set</a></li>
+    <li><a href="#directives">8. Assembler Directives</a></li>
+    <li><a href="#interrupts">9. Interrupts &amp; Faults</a></li>
+    <li><a href="#hwi">10. Hardware Interrupts</a></li>
+    <li><a href="#pmio">11. Port-Mapped I/O (PMIO)</a></li>
+  </ul>
+  <div class="section-label">System</div>
+  <ul>
+    <li><a href="#video">12. Video Output</a></li>
+    <li><a href="#boot">13. Boot Sequence</a></li>
+    <li><a href="#shell">14. Pre-Run Shell Reference</a></li>
+    <li><a href="#liveshell">15. Live Running Shell (F12)</a></li>
+    <li><a href="#debugger">16. Debugger GUI</a></li>
+    <li><a href="#appendix">17. Appendix: Opcode Table</a></li>
+  </ul>
+</nav>
+
+<main>
+
+  <h1>VSK-E16A Reference Manual</h1>
+  <div class="tagline">Instruction Set Architecture &amp; System Overview</div>
+  <div class="meta-row">
+    <span><b>Revision</b> 1.0</span>
+    <span><b>Word size</b> 16-bit</span>
+    <span><b>Address space</b> 64K words (128 KiB)</span>
+    <span><b>Endianness</b> Big-endian (storage)</span>
+    <span><b>Host</b> Python software VM</span>
+    <span><b>Opcode count</b> 28</span>
+  </div>
+
+  <a class="anchor-target" id="intro"></a>
+  <h2><span class="num">1.</span>Introduction</h2>
+  <p>
+    The VSK-E16A ("ExVSKa") is a 16-bit CISC-like virtual machine, and the newest member of the Virtual
+    System Komputer (VSK) family. It implements a flat 64K-word memory space, sixteen general-purpose
+    registers, a condition flag register, a descending hardware stack, and &mdash; new to this machine
+    &mdash; a hardware interrupt line and a stack-based port-mapped I/O (PMIO) subsystem for talking to
+    virtual peripherals such as disk.
+  </p>
+  <p>
+    This manual documents the VSK-E16A instruction set, memory layout, register file, interrupt model
+    (both software and hardware), the PMIO subsystem, and the surrounding tooling (pre-run shell, live
+    in-execution debug shell, and the debugger GUI).
+  </p>
+
+  <div class="callout">
+    <span class="label">Scope note</span>
+    This document describes the VSK-E16A as implemented in the reference emulator. Some behaviours
+    (e.g. the bit-flopper, triple-fault handling, exact debugger performance tricks) are emulator
+    features rather than strictly architectural guarantees, and are called out where relevant.
+  </div>
+
+  <a class="anchor-target" id="relation"></a>
+  <h2><span class="num">2.</span>Relation to VSK-16A</h2>
+  <p>
+    VSK-E16A is described by its own source as <em>"a copy of the VSK-16A &mdash; adds hardware
+    interrupts and PMIO."</em> The "E" stands for <em>extended</em>. It shares VSK-16A's general shape
+    (16-bit words, 16 general-purpose registers, CISC-like variable-length instructions, the same
+    assembler directive syntax) but is a genuinely different machine with a different opcode table and
+    several removed subsystems. <strong>This manual should not be assumed to describe VSK-16A, and
+    vice versa &mdash; treat them as siblings, not versions of one machine.</strong>
+  </p>
+  <table>
+    <tr><th>Removed from VSK-16A</th><th>Detail</th></tr>
+    <tr><td>Legacy (255) video mode</td><td>Gone entirely. There is only one video region and one rendering path now &mdash; see <a href="#video">Video Output</a>.</td></tr>
+    <tr><td>Video mode flag</td><td>No flag byte to select a display mode, since there's only one mode.</td></tr>
+    <tr><td>Keyboard input buffer</td><td>The fixed memory-mapped buffer at <code>0xF000</code>&ndash;<code>0xF09A</code> is gone. Keyboard input now arrives via a hardware interrupt, not a polled buffer &mdash; see <a href="#hwi">Hardware Interrupts</a>.</td></tr>
+    <tr><td><code>KEY</code> opcode</td><td>Removed along with the buffer it served. Its old opcode number (60) now belongs to <code>DHI</code>.</td></tr>
+    <tr><td><code>DREAD</code> / <code>DWRITE</code></td><td>Removed. Disk access is now performed through PMIO rather than dedicated opcodes &mdash; see <a href="#pmio">Port-Mapped I/O</a>. Their old opcode numbers (78, 80) now belong to <code>EHI</code> and <code>IN</code>.</td></tr>
+  </table>
+  <table>
+    <tr><th>Added in VSK-E16A</th><th>Detail</th></tr>
+    <tr><td>Hardware interrupt line</td><td>A new <code>iF</code> (interrupt flag) register, plus a dedicated keyboard hardware-interrupt vector, let the CPU react to input asynchronously instead of blocking on it.</td></tr>
+    <tr><td>PMIO subsystem</td><td>A 256-entry stack-based port I/O model, with disk access implemented as a virtual device on port 1.</td></tr>
+    <tr><td>5 new opcodes</td><td><code>DHI</code>, <code>EHI</code>, <code>IN</code>, <code>OUT</code>, <code>SHLT</code> &mdash; see <a href="#isa">Instruction Set</a>.</td></tr>
+    <tr><td>Live in-execution debug shell</td><td>An <kbd>F12</kbd>-triggered shell that pauses the running VM for live register/memory edits, distinct from the pre-run shell &mdash; see <a href="#liveshell">Live Running Shell</a>.</td></tr>
+    <tr><td>Reworked debugger GUI</td><td>Adds a live decompiler view, exact-word IP highlighting, PMIO/interrupt-flag telemetry, and a guest clock-speed readout.</td></tr>
+  </table>
+
+  <a class="anchor-target" id="arch"></a>
+  <h2><span class="num">3.</span>Architecture Overview</h2>
+  <p>
+    Execution is a fetch&ndash;decode&ndash;execute loop, structurally the same as VSK-16A: every cycle
+    the CPU reads the word at <code>IP</code>, advances <code>IP</code>, and dispatches on it via the
+    microcode table. A zero word is treated as padding and skipped. Instruction operands are pulled
+    lazily by each handler rather than decoded up front, so instruction length is opcode-defined.
+  </p>
+
+  <div class="step-flow">
+    <div class="step">Fetch word at IP</div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">IP += 1 (mod 0x10000)</div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">Check iF / HWI</div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">Lookup opcode</div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">Execute handler</div>
+    <span class="arrow">&rarr;</span>
+    <div class="step">Loop</div>
+  </div>
+
+  <p>
+    One structural change from VSK-16A: <code>IP</code> is now masked to 16 bits on <em>every</em>
+    increment inside the fetch primitive itself, rather than only being corrected after the fact at the
+    top of the fetch loop. The fetch loop still carries its own wraparound guard as a second line of
+    defence, so in practice <code>IP</code> cannot be observed out of the <code>0x0000</code>&ndash;<code>0xFFFF</code>
+    range at any point software could inspect it.
+  </p>
+
+  <h3>Fault handling</h3>
+  <p>
+    Every instruction dispatch is wrapped in a guarded call. If a handler raises one of the VM's typed
+    exceptions (bad register index, stack over/underflow, out-of-range jump target, PMIO stack
+    over/underflow, unmapped hardware port, etc.), the CPU does <em>not</em> crash the process. Instead
+    it:
+  </p>
+  <ul class="clean">
+    <li>Maps the exception type to a small numeric fault code.</li>
+    <li>Stores the fault code in <code>R13</code> and the faulting <code>IP</code> in <code>R14</code>.</li>
+    <li>Zeroes video memory from <code>0xF101</code> through <code>0xFFFF</code>.</li>
+    <li>Clears the PMIO stack entirely.</li>
+    <li>Redirects <code>IP</code> to the handler address stored in <code>Memory[0x00FF]</code> (the fault vector).</li>
+    <li>Starts a 10-second window after which the fault-trapped state automatically clears if nothing else goes wrong &mdash; see <a href="#interrupts">Interrupts &amp; Faults</a>.</li>
+    <li>Resumes the fetch loop from there.</li>
+  </ul>
+
+  <a class="anchor-target" id="memmap"></a>
+  <h2><span class="num">4.</span>Memory Map</h2>
+  <p>Memory is a flat array of <code>2<sup>16</sup></code> (65,536) words, addressed 0x0000&ndash;0xFFFF.</p>
+
+  <div class="mem-map-row"><div class="addr">0x0000 &ndash; 0x00FF</div><div class="label">Interrupt Vector Table (IVT)</div></div>
+  <div class="mem-map-row"><div class="addr">0x00EF</div><div class="label">Hardware keyboard interrupt vector</div></div>
+  <div class="mem-map-row"><div class="addr">0x00FF</div><div class="label">Fault handler vector (same slot doubles as software-interrupt target <code>0xFF</code> if written to)</div></div>
+  <div class="mem-map-row"><div class="addr">0x0000 &ndash; 0x08FF</div><div class="label">BIOS load region (BIOS image copied here at boot)</div></div>
+  <div class="mem-map-row"><div class="addr">0x0900</div><div class="label">Legacy boot signature slot (still respected as a load boundary; see <a href="#boot">Boot Sequence</a>)</div></div>
+  <div class="mem-map-row"><div class="addr">0x0000</div><div class="label">Initial / post-reset stack pointer value</div></div>
+  <div class="mem-map-row"><div class="addr">0xF100 &ndash; 0xFFFF</div><div class="label">Video memory (single region &mdash; no mode flag, no legacy region)</div></div>
+
+  <div class="callout warn">
+    <span class="label">No more keyboard buffer</span>
+    VSK-16A reserved <code>0xF000</code>&ndash;<code>0xF09A</code> for a polled keyboard buffer.
+    VSK-E16A has no such region &mdash; that whole address range is ordinary general-purpose memory now.
+    Keyboard input arrives exclusively through the hardware interrupt mechanism described in
+    <a href="#hwi">Hardware Interrupts</a>.
+  </div>
+
+  <div class="callout warn">
+    <span class="label">Stack bounds &amp; MOVSP</span>
+    The stack grows <em>down</em> from its starting address. <code>PUSH</code> decrements the stack
+    pointer before writing; <code>POP</code> reads then increments. Every push/pop/call/ret checks the
+    resulting stack pointer against <code>0x0000</code>&ndash;<code>0xFFFF</code> and raises
+    <code>StackOverflow</code> (underflowed below zero) or <code>StackUnderflow</code> (grew past
+    <code>0xFFFF</code>). The stack pointer can be set directly with <code>MOVSP</code>, which BIOS/OS
+    code is expected to use to establish its own stack region.
+  </div>
+
+  <a class="anchor-target" id="regs"></a>
+  <h2><span class="num">5.</span>Registers &amp; Flags</h2>
+
+  <div class="grid2">
+    <div class="opcode-card">
+      <div class="head"><span class="mnemonic">R0&ndash;R15</span><span class="badge">general purpose</span></div>
+      <p class="desc">16 general-purpose 16-bit registers, referenced in assembly as <code>r0</code> through <code>r15</code>. Two carry conventional meaning:</p>
+      <ul class="clean">
+        <li><code>R13</code> &mdash; last fault code (written automatically on a trapped exception)</li>
+        <li><code>R14</code> &mdash; faulting instruction pointer (written automatically on a trapped exception)</li>
+      </ul>
+    </div>
+    <div class="opcode-card">
+      <div class="head"><span class="mnemonic">IP</span><span class="badge">hardware reserved</span></div>
+      <p class="desc">Instruction pointer. Points at the next word to fetch. Masked to 16 bits on every increment.</p>
+    </div>
+    <div class="opcode-card">
+      <div class="head"><span class="mnemonic">SP (stack)</span><span class="badge">hardware reserved</span></div>
+      <p class="desc">Stack pointer, initialised to <code>0x0000</code>. Decrements on push, increments on pop. Settable directly via <code>MOVSP</code>.</p>
+    </div>
+    <div class="opcode-card">
+      <div class="head"><span class="mnemonic">FLAGS</span><span class="badge">hardware reserved</span></div>
+      <p class="desc">Comparison flag, set by <code>CMP</code> and reset by <code>CLF</code>:</p>
+      <div class="flags-badge"><span class="fv">0</span> no comparison performed yet</div>
+      <div class="flags-badge"><span class="fv">1</span> operands were equal (EQ)</div>
+      <div class="flags-badge"><span class="fv">2</span> first operand was greater (HI)</div>
+      <div class="flags-badge"><span class="fv">3</span> first operand was less (LO)</div>
+      <div class="flags-badge"><span class="fv">0xFFFF</span> explicitly cleared via <code>CLF</code></div>
+    </div>
+    <div class="opcode-card">
+      <div class="head"><span class="mnemonic">iF (interrupt flag)</span><span class="badge">hardware reserved &mdash; new</span></div>
+      <p class="desc">A single hardware-reserved flag controlling whether the CPU checks for pending hardware interrupts on each cycle. <code>0</code> = hardware interrupts disabled, <code>1</code> = enabled. Set and cleared via <code>EHI</code> and <code>DHI</code> respectively. See <a href="#hwi">Hardware Interrupts</a>.</p>
+    </div>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">Hardware-reserved pseudo-registers</span><span class="badge">MOVFS source IDs</span></div>
+    <p class="desc"><code>MOVFS</code> reads one of the hardware-reserved registers into a general-purpose register via a fixed numeric ID. These IDs exist only as immediate operands to <code>MOVFS</code>.</p>
+    <table>
+      <tr><th>Assembly name</th><th>ID</th><th>Underlying register</th></tr>
+      <tr><td><code>rSP</code></td><td>22</td><td>Stack pointer</td></tr>
+      <tr><td><code>rFLAGS</code></td><td>44</td><td>Flags register</td></tr>
+      <tr><td><code>rIP</code></td><td>99</td><td>Instruction pointer</td></tr>
+    </table>
+    <p class="desc small">There is no <code>MOVFS</code> source ID for <code>iF</code> &mdash; the interrupt flag is not readable this way as of Rev 1.0.</p>
+  </div>
+
+  <a class="anchor-target" id="addrmodes"></a>
+  <h2><span class="num">6.</span>Addressing Modes</h2>
+  <p>
+    Used by <code>MOV</code>. Each mode has a numeric encoding stored inline in the instruction stream.
+  </p>
+  <table>
+    <tr><th>Mode</th><th>Value</th><th>Syntax</th><th>Meaning</th></tr>
+    <tr><td>REGISTER</td><td><code>1</code></td><td><code>r3</code></td><td>Operand is a register's value.</td></tr>
+    <tr><td>IMMEDIATE</td><td><code>2</code></td><td><code>42</code> / <code>0x2A</code></td><td>Operand is a literal constant (source only).</td></tr>
+    <tr><td>MEMORY_REGISTER</td><td><code>3</code></td><td><code>[r3]</code></td><td>Operand is memory at the address held in a register.</td></tr>
+    <tr><td>MEMORY_ADDRESS</td><td><code>4</code></td><td><code>[0x1000]</code></td><td>Operand is memory at a literal address.</td></tr>
+  </table>
+  <div class="callout">
+    <span class="label">MOV semantics</span>
+    Destination mode <code>1</code> writes a register; modes <code>3</code>/<code>4</code> write memory
+    (register-indirect or direct). Source mode <code>2</code> (immediate) is used as-is; modes
+    <code>1</code>/<code>3</code>/<code>4</code> are resolved to a value before the write.
+  </div>
+
+  <a class="anchor-target" id="isa"></a>
+  <h2><span class="num">7.</span>Instruction Set</h2>
+  <p>Each entry shows the mnemonic, encoded size in words, opcode word value, operand encoding, and runtime behaviour. Opcodes carried over unchanged from VSK-16A are marked accordingly; new and reassigned opcodes are called out.</p>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">HLT</span><span class="badge op">op 1</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">HLT</span></div>
+    <p class="desc">Halts the CPU and drops into the shutdown routine, which prints final register state and returns to the pre-run shell.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">MOV</span><span class="badge op">op 4</span><span class="badge size">5 words</span></div>
+    <div class="encoding"><span class="field">MOV dest, src</span> &rarr; [4][mode_a][mode_b][dest][src]</div>
+    <p class="desc">Moves a value between register/memory/immediate locations. See <a href="#addrmodes">Addressing Modes</a>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">VOUT</span><span class="badge op">op 8</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">VOUT</span></div>
+    <p class="desc">Flushes video memory to the terminal. See <a href="#video">Video Output</a> &mdash; behaviour has changed significantly from VSK-16A, since legacy mode no longer exists.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">ADD / SUB / MUL / DIV</span><span class="badge op">op 12/16/20/24</span><span class="badge size">4 words</span></div>
+    <div class="encoding"><span class="field">ADD dest, a, b</span> &rarr; [op][a][b][dest]</div>
+    <p class="desc">Reads registers <code>a</code> and <code>b</code>, performs the arithmetic op, masks the result to 16 bits, writes it to <code>dest</code>. Unchanged from VSK-16A.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">JMP</span><span class="badge op">op 28</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">JMP target</span> &rarr; [28][address]</div>
+    <p class="desc">Unconditional jump. Bounds-checked; raises <code>RoutineAddressOutOfBounds</code> if outside <code>0x0000</code>&ndash;<code>0xFFFF</code>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">CALL</span><span class="badge op">op 32</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">CALL label</span> &rarr; [32][address]</div>
+    <p class="desc">Pushes the return address, jumps to the target label. Only label operands are supported.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">RET</span><span class="badge op">op 36</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">RET</span></div>
+    <p class="desc">Pops the top of the stack into <code>IP</code>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">PUSH</span><span class="badge op">op 40</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">PUSH r</span> &rarr; [40][reg]</div>
+    <p class="desc">Decrements the stack pointer, then writes the register's value to the new stack-top address.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">POP</span><span class="badge op">op 44</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">POP r</span> &rarr; [44][reg]</div>
+    <p class="desc">Reads the value at the current stack-top address into the register, then increments the stack pointer.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">CMP</span><span class="badge op">op 48</span><span class="badge size">3 words</span></div>
+    <div class="encoding"><span class="field">CMP a, b</span> &rarr; [48][reg_a][reg_b]</div>
+    <p class="desc">Compares two registers, setting <code>FLAGS</code>: <code>1</code> if equal, <code>2</code> if <code>a &gt; b</code>, <code>3</code> if <code>a &lt; b</code>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">JE</span><span class="badge op">op 52</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">JE target</span> &rarr; [52][address]</div>
+    <p class="desc">Jumps if <code>FLAGS == 1</code>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">JNE</span><span class="badge op">op 56</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">JNE target</span> &rarr; [56][address]</div>
+    <p class="desc">Jumps if <code>FLAGS</code> is neither <code>1</code> (equal) nor <code>0xFFFF</code> (explicitly cleared).</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">DHI</span><span class="badge op">op 60</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">DHI</span></div>
+    <p class="desc"><b>New. Reassigned from <code>KEY</code> in VSK-16A.</b> "Disable Hardware Interrupts." Sets <code>iF</code> to <code>0</code>. While disabled, the CPU does not check for or act on pending hardware interrupts (e.g. keyboard). See <a href="#hwi">Hardware Interrupts</a>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">LOAD</span><span class="badge op">op 64</span><span class="badge size">variable</span></div>
+    <div class="encoding"><span class="field">LOAD r, "text"</span> &rarr; [64][reg][char]...[char][0]</div>
+    <p class="desc">Writes a null-terminated ASCII string directly into memory starting at the address held in register <code>r</code>. Encoded size is <code>2 + len(text) + 1</code> words.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">INC</span><span class="badge op">op 68</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">INC r</span> &rarr; [68][reg]</div>
+    <p class="desc">Increments the register by 1, masked to 16 bits.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">DEC</span><span class="badge op">op 72</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">DEC r</span> &rarr; [72][reg]</div>
+    <p class="desc">Decrements the register by 1, masked to 16 bits.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">NUMP</span><span class="badge op">op 76</span><span class="badge size">3 words</span></div>
+    <div class="encoding"><span class="field">NUMP addr_reg, value_reg</span> &rarr; [76][addr_reg][value_reg]</div>
+    <p class="desc">Converts the numeric value in <code>value_reg</code> to decimal ASCII digits and writes them into memory starting at the address in <code>addr_reg</code>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">EHI</span><span class="badge op">op 78</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">EHI</span></div>
+    <p class="desc"><b>New. Reassigned from <code>DREAD</code> in VSK-16A.</b> "Enable Hardware Interrupts." Sets <code>iF</code> to <code>1</code>. Once enabled, the CPU checks for a pending hardware interrupt every cycle. See <a href="#hwi">Hardware Interrupts</a>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">IN</span><span class="badge op">op 80</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">IN r</span> &rarr; [80][reg]</div>
+    <p class="desc"><b>New. Reassigned from <code>DWRITE</code> in VSK-16A.</b> Pops the top value off the PMIO stack into register <code>r</code>. Raises <code>PMIO_StackUnderFlow</code> if the PMIO stack is empty. See <a href="#pmio">Port-Mapped I/O</a>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">INT</span><span class="badge op">op 82</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">INT vector</span> &rarr; [82][vector]</div>
+    <p class="desc">Software interrupt. <code>vector</code> must fall within the IVT (<code>0x0000</code>&ndash;<code>0x00FF</code>) or <code>InvalidInterrupt</code> is raised. Pushes the return <code>IP</code>, then jumps to the address stored at the vector location.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">JH</span><span class="badge op">op 84</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">JH target</span> &rarr; [84][address]</div>
+    <p class="desc">Jumps if <code>FLAGS == 2</code> (last <code>CMP</code> found the first operand greater).</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">JL</span><span class="badge op">op 86</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">JL target</span> &rarr; [86][address]</div>
+    <p class="desc">Jumps if <code>FLAGS == 3</code> (last <code>CMP</code> found the first operand less).</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">CLF</span><span class="badge op">op 88</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">CLF</span></div>
+    <p class="desc">Sets <code>FLAGS</code> to the sentinel value <code>0xFFFF</code>. <b>New in VSK-E16A:</b> also clears any pending triple-fault state (<code>T_FAULT</code> is reset to false), where in VSK-16A it only affected <code>FLAGS</code>.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">JPTR</span><span class="badge op">op 90</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">JPTR r</span> &rarr; [90][reg]</div>
+    <p class="desc">Register-indirect jump: sets <code>IP</code> to the value held in register <code>r</code>. Register index bounds-checked; the resulting address is not further bounds-checked.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">MOVFS</span><span class="badge op">op 92</span><span class="badge size">3 words</span></div>
+    <div class="encoding"><span class="field">MOVFS dest, rIP|rSP|rFLAGS</span> &rarr; [92][dest][src_id]</div>
+    <p class="desc">Copies the value of a hardware-reserved register into a general-purpose register. Source is one of the fixed pseudo-register IDs (<code>rSP</code>=22, <code>rFLAGS</code>=44, <code>rIP</code>=99).</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">MOVSP</span><span class="badge op">op 94</span><span class="badge size">2 words</span></div>
+    <div class="encoding"><span class="field">MOVSP r</span> &rarr; [94][reg]</div>
+    <p class="desc">Sets <code>SP</code> directly to the value held in register <code>r</code>. The register index is bounds-checked; the new stack pointer value itself is not range-checked until the next push/pop/call/ret.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">OUT</span><span class="badge op">op 96</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">OUT</span> &rarr; [96] &mdash; uses R1/R2/R3 implicitly</div>
+    <p class="desc"><b>New.</b> Port-mapped output. Takes no encoded operands; instead reads <code>R1</code> = port number, <code>R2</code> = value, <code>R3</code> = notify flag. See <a href="#pmio">Port-Mapped I/O</a> for the full calling convention.</p>
+  </div>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">SHLT</span><span class="badge op">op 98</span><span class="badge size">1 word</span></div>
+    <div class="encoding"><span class="field">SHLT</span></div>
+    <p class="desc"><b>New.</b> "Soft halt." Spins in place, repeatedly polling for a hardware interrupt, until one occurs. If <code>iF</code> is <code>0</code> when <code>SHLT</code> runs, this spins forever &mdash; documented as intentional behaviour, not a bug. This is the idiomatic way to make a VSK-E16A program idle efficiently until keyboard input arrives, analogous to a real CPU's <code>HLT</code>-until-interrupt idiom.</p>
+  </div>
+
+  <div class="callout danger">
+    <span class="label">Removed opcodes</span>
+    <code>KEY</code>, <code>DREAD</code>, and <code>DWRITE</code> do not exist in VSK-E16A. Their old
+    opcode numbers were reassigned to <code>DHI</code>, <code>EHI</code>, and <code>IN</code>
+    respectively &mdash; a VSK-16A binary image containing those instructions will not run correctly
+    (or at all) on VSK-E16A, since the same numeric opcodes now mean something entirely different.
+  </div>
+
+  <a class="anchor-target" id="directives"></a>
+  <h2><span class="num">8.</span>Assembler Directives</h2>
+  <p>Directives begin with <code>%</code> and are resolved entirely at assemble time.</p>
+  <table>
+    <tr><th>Directive</th><th>Syntax</th><th>Effect</th></tr>
+    <tr><td><code>%REGION</code></td><td><code>%REGION 0x2000</code></td><td>Moves the assembler's write cursor to the given address.</td></tr>
+    <tr><td><code>%DEFINEWORD</code></td><td><code>%DEFINEWORD 1, 2, "AB", 0x10</code></td><td>Emits a sequence of raw words at the current cursor. Decimal/hex literals emit single words; strings expand to one word per character.</td></tr>
+    <tr><td><code>%STR</code></td><td><code>%STR 0x3000 "hello"</code></td><td>Writes a string directly to an absolute address at assemble time, no terminator.</td></tr>
+    <tr><td><code>%ASC</code></td><td><code>%ASC 0x3000 "A"</code></td><td>Writes a single character's ASCII code to an absolute address.</td></tr>
+  </table>
+  <div class="callout danger">
+    <span class="label">Removed: %include</span>
+    An earlier <code>%include</code> directive existed but has been removed &mdash; per the assembler's
+    own comment, it never worked correctly with available editor tooling and was dropped rather than
+    fixed.
+  </div>
+  <div class="callout">
+    <span class="label">Labels</span>
+    A line ending in <code>:</code> declares a label at the current assembly cursor position. Labels are
+    resolved in a pre-pass and may be used as jump/call targets or as <code>MOV</code> operands.
+  </div>
+
+  <a class="anchor-target" id="interrupts"></a>
+  <h2><span class="num">9.</span>Interrupts &amp; Faults</h2>
+  <h3>Software interrupts</h3>
+  <p>
+    <code>INT</code> requires its vector to fall inside the IVT (<code>0x0000</code>&ndash;<code>0x00FF</code>);
+    the handler address is read from that slot, and execution jumps there after pushing a return address.
+    A vector outside the IVT raises <code>InvalidInterrupt</code>.
+  </p>
+
+  <h3>Fault trapping</h3>
+  <table>
+    <tr><th>Exception</th><th>Fault code</th><th>Raised when&hellip;</th></tr>
+    <tr><td><code>OpcodeTrap</code></td><td>7</td><td>A generic failure occurs inside <code>MOV</code>, arithmetic, or <code>LOAD</code> handling.</td></tr>
+    <tr><td><code>StackOverflow</code></td><td>10</td><td>The stack pointer would fall below <code>0x0000</code>.</td></tr>
+    <tr><td><code>StackUnderflow</code></td><td>11</td><td>The stack pointer would rise above <code>0xFFFF</code>.</td></tr>
+    <tr><td><code>MMIO_OutOfBounds</code></td><td>24</td><td><code>VOUT</code>'s video memory scan walks past the top of the address space.</td></tr>
+    <tr><td><code>RoutineAddressOutOfBounds</code></td><td>79</td><td>A jump/call/branch target falls outside <code>0x0000</code>&ndash;<code>0xFFFF</code>.</td></tr>
+    <tr><td><code>PMIO_HardwareIOPortNotFound</code></td><td>86</td><td><code>OUT</code> is used in notify mode against a port with no registered device.</td></tr>
+    <tr><td><code>PMIO_StackOverFlow</code></td><td>88</td><td>The PMIO stack would exceed 256 entries.</td></tr>
+    <tr><td><code>PMIO_StackUnderFlow</code></td><td>92</td><td><code>IN</code> is used while the PMIO stack is empty.</td></tr>
+    <tr><td><code>InvalidInterrupt</code></td><td>178</td><td>An <code>INT</code> vector falls outside the IVT range.</td></tr>
+    <tr><td><code>RegisterOutOfBounds</code></td><td>200</td><td>Any instruction references a register index outside 0&ndash;15.</td></tr>
+    <tr><td><code>DiskIO</code></td><td>300</td><td>A PMIO-mediated disk read/write encounters a raw I/O failure.</td></tr>
+    <tr><td>Unmapped / unknown</td><td>800</td><td>Any other exception not covered above.</td></tr>
+  </table>
+  <p>
+    On trap: <code>R13</code> receives the fault code, <code>R14</code> receives the faulting
+    instruction pointer, video memory from <code>0xF101</code> through <code>0xFFFF</code> is zeroed,
+    the PMIO stack is cleared entirely, and <code>IP</code> is redirected to the handler address stored
+    in <code>Memory[0x00FF]</code>.
+  </p>
+  <div class="callout warn">
+    <span class="label">Wider fault-zeroing than VSK-16A</span>
+    Because there's only one video region now, the fault handler's memory-clear sweep covers the entire
+    thing (<code>0xF101</code>&ndash;<code>0xFFFF</code>), unlike VSK-16A Rev 7.0 where a fault only
+    zeroed the legacy region and left the extended region untouched.
+  </div>
+
+  <div class="callout danger">
+    <span class="label">Triple fault window is now time-limited</span>
+    In VSK-16A, once the machine entered a trapped fault state, a second fault during that state was
+    unconditionally treated as a triple fault. VSK-E16A adds a 10-second timer: if no second fault
+    occurs within 10 seconds of the first, the trapped state automatically clears itself in the
+    background. A second fault that lands <em>within</em> that 10-second window still triggers a triple
+    fault exactly as before. <code>CLF</code> can also clear the trapped state early and manually.
+  </div>
+
+  <a class="anchor-target" id="hwi"></a>
+  <h2><span class="num">10.</span>Hardware Interrupts</h2>
+  <p>
+    VSK-E16A adds a genuine hardware interrupt line, distinct from the software <code>INT</code>
+    instruction. It exists specifically to let the CPU react to keyboard input without a program having
+    to block waiting for it.
+  </p>
+
+  <h3>The interrupt flag (iF)</h3>
+  <p>
+    A single hardware-reserved bit, toggled by <code>EHI</code> (enable, sets <code>iF=1</code>) and
+    <code>DHI</code> (disable, sets <code>iF=0</code>). Every cycle, if <code>iF</code> is set, the fetch
+    loop polls for a pending key press before executing the next instruction.
+  </p>
+
+  <h3>Delivery mechanism</h3>
+  <p>
+    When a key is detected while <code>iF</code> is set, the CPU:
+  </p>
+  <ol class="clean">
+    <li>Pushes the key's raw code onto the <a href="#pmio">PMIO stack</a> (not the ordinary call stack).</li>
+    <li>Decrements the stack pointer and pushes the current <code>IP</code> onto the ordinary call stack, the same way a software <code>CALL</code> or <code>INT</code> would &mdash; but with one difference: if the stack pointer would go out of bounds, the hardware interrupt handler silently restores the stack pointer and returns early rather than raising a fault. Because this delivery path runs outside <code>Instruct()</code>'s guarded dispatch, a general-protection-style fault genuinely cannot be raised from here.</li>
+    <li>Sets <code>IP</code> to the address stored at the fixed keyboard interrupt vector, <code>Memory[0x00EF]</code>.</li>
+  </ol>
+  <p>
+    Handler code at that address is responsible for reading the key back off the PMIO stack (typically
+    via <code>IN</code>) and returning with <code>RET</code>, the same as any other interrupt handler
+    would.
+  </p>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">Minimal keyboard-driven idle loop</span></div>
+    <pre><code>; install a handler at 0x00EF beforehand, e.g.:
+; mov [0x00EF], KEY_HANDLER
+
+ehi              ; enable hardware interrupts
+
+idle:
+  shlt           ; sleep until a key arrives
+  jmp idle       ; handler already ran and returned by the time we get here
+
+KEY_HANDLER:
+  in r1          ; pop the key code off the PMIO stack into r1
+  ; ... handle the key in r1 ...
+  ret</code></pre>
+    <p class="desc">This is the idiomatic VSK-E16A pattern for input-driven code: enable hardware interrupts once, then use <code>SHLT</code> to idle cheaply rather than busy-polling.</p>
+  </div>
+
+  <div class="callout">
+    <span class="label">Polling cadence outside the interrupt system</span>
+    Independent of <code>iF</code>, the fetch loop checks for the host <kbd>P</kbd> (pause) and
+    <kbd>F12</kbd> (live shell) keys roughly every 16,384 cycles as a low-overhead background check.
+    This is an emulator/tooling convenience, not part of the hardware interrupt model itself, and is not
+    something guest software can observe or rely on.
+  </div>
+
+  <a class="anchor-target" id="pmio"></a>
+  <h2><span class="num">11.</span>Port-Mapped I/O (PMIO)</h2>
+  <p>
+    PMIO is VSK-E16A's mechanism for talking to virtual hardware devices &mdash; currently just disk,
+    but the port model is general. Unlike VSK-16A's dedicated <code>DREAD</code>/<code>DWRITE</code>
+    opcodes, all device communication goes through a shared 256-entry LIFO stack and two generic
+    instructions, <code>IN</code> and <code>OUT</code>.
+  </p>
+
+  <h3>The PMIO stack</h3>
+  <p>
+    A single stack, capacity 256 words, shared by all ports and by hardware interrupt delivery (see
+    above). <code>IN</code> pops from it into a register; <code>OUT</code> in non-notify mode pushes a
+    raw value onto it directly. It is entirely separate from the CPU's own call/data stack (<code>SP</code>).
+  </p>
+  <div class="callout warn">
+    <span class="label">Shared, not per-device</span>
+    There is exactly one PMIO stack for the whole machine &mdash; it is not partitioned per port. Device
+    protocols (like the disk protocol below) rely on pushing/popping values in a specific order and
+    trust that nothing else interleaves with them in between. A hardware interrupt firing mid-sequence
+    also pushes onto this same stack, so software driving a multi-step PMIO protocol should keep
+    interrupts disabled (<code>DHI</code>) for the duration if correctness matters.
+  </div>
+
+  <h3><code>OUT</code> calling convention</h3>
+  <p><code>OUT</code> takes no encoded operands; it reads three registers:</p>
+  <table>
+    <tr><th>Register</th><th>Meaning</th></tr>
+    <tr><td><code>R1</code></td><td>Target port number</td></tr>
+    <tr><td><code>R2</code></td><td>Value (used only when not notifying)</td></tr>
+    <tr><td><code>R3</code></td><td>Notify flag &mdash; truthy selects device-notify mode, falsy selects raw-push mode</td></tr>
+  </table>
+  <ul class="clean">
+    <li><b>Notify mode (<code>R3</code> truthy):</b> looks up <code>R1</code> in the port map and invokes that device's driver directly. <code>R2</code> is ignored in this mode. Raises <code>PMIO_HardwareIOPortNotFound</code> if the port has no registered device.</li>
+    <li><b>Raw-push mode (<code>R3</code> falsy):</b> pushes <code>R2</code> onto the PMIO stack as-is, without involving any device. Raises <code>PMIO_StackOverFlow</code> if the stack is already at capacity.</li>
+  </ul>
+
+  <h3><code>IN</code> calling convention</h3>
+  <p>
+    <code>IN r</code> pops the top of the PMIO stack into register <code>r</code>. Raises
+    <code>PMIO_StackUnderFlow</code> if the stack is empty.
+  </p>
+
+  <h3>Port map</h3>
+  <table>
+    <tr><th>Port</th><th>Device</th></tr>
+    <tr><td><code>1</code></td><td>Mass storage (disk)</td></tr>
+  </table>
+
+  <div class="opcode-card">
+    <div class="head"><span class="mnemonic">Disk device protocol (port 1)</span></div>
+    <p class="desc">Before notifying port 1, software must push a mode word and an address word onto the PMIO stack (and, for writes, a value word), in this exact order &mdash; the driver pops them in reverse:</p>
+    <table>
+      <tr><th>Mode</th><th>Stack contents before notify (bottom&rarr;top)</th><th>Effect</th></tr>
+      <tr><td><code>0</code> (read)</td><td>address, mode</td><td>Reads one word from disk at <code>address</code>, pushes the result back onto the PMIO stack.</td></tr>
+      <tr><td><code>1</code> (write)</td><td>value, address, mode</td><td>Writes <code>value</code> to disk at <code>address</code>. Nothing is pushed back.</td></tr>
+      <tr><td><code>2</code> (identify)</td><td>address (ignored), mode</td><td>Pushes a fixed device ID (<code>288</code>, "mass storage") onto the PMIO stack.</td></tr>
+      <tr><td>anything else</td><td>&mdash;</td><td>No-op &mdash; documented as intentional, not an error.</td></tr>
+    </table>
+    <pre><code>; read one word from disk address 0x0010, leave the result in r5
+
+; step 1: push address (bottom of what the driver will pop)
+mov r1, 1        ; port 1 (disk)
+mov r2, 0x0010   ; address
+mov r3, 0        ; raw push, no notify
+out
+
+; step 2: push mode on top of it
+mov r1, 1
+mov r2, 0        ; mode = read
+mov r3, 0
+out
+
+; step 3: notify the device - triggers VirtualHardware.Disk,
+; which pops mode then address in that order, and pushes the
+; result word back onto the PMIO stack
+mov r1, 1
+mov r3, 1        ; notify mode
+out
+
+; step 4: read the result back
+in r5</code></pre>
+    <p class="desc small">Push order matters: the driver pops <em>mode</em> first, then <em>address</em>, so address must be pushed before mode. Get this backwards and the driver reads the wrong values without any error, since <code>OUT</code>'s raw-push mode has no way to know what a value is "supposed" to mean.</p>
+  </div>
+
+  <div class="callout">
+    <span class="label">Raw disk I/O detail</span>
+    Underneath the PMIO protocol, disk reads/writes are plain 2-byte big-endian word seeks against the
+    disk image file. A short read or any other low-level I/O failure raises <code>DiskIO</code>
+    (fault code 300), same as VSK-16A.
+  </div>
+
+  <a class="anchor-target" id="video"></a>
+  <h2><span class="num">12.</span>Video Output</h2>
+  <p>
+    VSK-E16A has a single video region and a single rendering path &mdash; there is no mode flag and no
+    legacy fallback. <code>VOUT</code> always does the following:
+  </p>
+  <ol class="clean">
+    <li>Scans forward from <code>0xF100</code> toward <code>0xFFFF</code>, stopping at the first zero byte encountered.</li>
+    <li>Builds an in-memory frame buffer as it scans: printable bytes (<code>0</code>&ndash;<code>127</code>) are appended as characters; reserved byte values are appended as colour-switch escape codes (table below).</li>
+    <li>Performs a single flush at the end: one ANSI escape sequence to clear/reset the terminal, immediately followed by writing the entire assembled frame in one shot.</li>
+  </ol>
+  <p>
+    Because the terminal is only touched twice per <code>VOUT</code> call (clear, then write) rather
+    than once per byte, this does not flicker. If the scan pointer runs past <code>0xFFFF</code> without
+    hitting a terminating zero, it wraps to <code>0x0000</code> and raises <code>MMIO_OutOfBounds</code>.
+  </p>
+
+  <h3>Colour-switch codes</h3>
+  <table>
+    <tr><th>Byte</th><th>Effect</th></tr>
+    <tr><td><code>130</code></td><td>Switch terminal output colour to red</td></tr>
+    <tr><td><code>131</code></td><td>Switch terminal output colour to green</td></tr>
+    <tr><td><code>132</code></td><td>Switch terminal output colour to blue</td></tr>
+    <tr><td><code>133</code></td><td>Switch terminal output colour to dim/dark grey</td></tr>
+    <tr><td><code>134</code></td><td>Switch terminal output colour to cyan</td></tr>
+    <tr><td><code>135</code></td><td>Switch terminal background colour to red</td></tr>
+    <tr><td><code>136</code></td><td>Reset terminal colour</td></tr>
+  </table>
+  <p class="small">The code table itself is unchanged from VSK-16A Rev 7.0's extended mode; what's different is that this is now the <em>only</em> mode, with no flag to select or fall back from.</p>
+
+  <a class="anchor-target" id="boot"></a>
+  <h2><span class="num">13.</span>Boot Sequence</h2>
+
+  <h3>Startup gate</h3>
+  <p>
+    On launch, the VM checks whether <kbd>Ctrl</kbd> is being held:
+  </p>
+  <ul class="clean">
+    <li><b>Ctrl held</b> &mdash; the interactive pre-run shell opens.</li>
+    <li><b>Ctrl not held</b> &mdash; the VM loads the default hard-disk image into memory immediately. If <kbd>P</kbd> is also being held, it then pauses with a message and waits for <kbd>Enter</kbd> before continuing &mdash; but note that the image has already been loaded into memory by this point, unlike the pause behaviour in VSK-16A, which deferred the load itself until after the pause was released.</li>
+  </ul>
+
+  <h3>BIOS loading</h3>
+  <p>
+    The BIOS image is a <code>.rom</code> file. If missing, the VM raises <code>CriticalError(55)</code>
+    and halts with a "VMBIOS Not Present" message. When present, it's copied into memory starting at
+    <code>0x0000</code> up to (and including) <code>0x08FF</code>, preserving whatever convention the
+    BIOS itself uses at <code>0x0900</code> and beyond.
+  </p>
+  <div class="callout warn">
+    <span class="label">No confirmed VBPT/legacy-signature behaviour for VSK-E16A</span>
+    VSK-16A's reference BIOS validated a VSK Boot Protocol Table (VBPT) at <code>0x1100</code> and fell
+    back to a legacy signature check at <code>0x0900</code>. The VSK-E16A emulator still respects
+    <code>0x0900</code> as a BIOS-load boundary (the same <code>END = 0x0900-1</code> convention), which
+    is consistent with a VBPT-style boot table still being in use at the BIOS level &mdash; but no
+    VSK-E16A-specific BIOS source has been reviewed for this manual, and legacy 255-mode fallback
+    specifically cannot apply anymore since that display mode no longer exists. Treat any VBPT details
+    from the VSK-16A manual as unconfirmed for VSK-E16A until a VSK-E16A BIOS source is available.
+  </div>
+
+  <h3>BIOS compatibility shim</h3>
+  <p>
+    Same mechanism as VSK-16A: the shell's <code>enabcsm</code> command patches the first 10 words of
+    the loaded BIOS image with a stub (<code>MOV R1, 0xEFFF</code> / <code>MOVSP R1</code> /
+    <code>JMP 0x0600</code>) for older BIOS images that never set up their own stack. As before, this
+    unconditionally overwrites the first 10 words of whatever is loaded, so it will break a BIOS that
+    already sets up its own stack at a conflicting address.
+  </p>
+
+  <a class="anchor-target" id="shell"></a>
+  <h2><span class="num">14.</span>Pre-Run Shell Reference</h2>
+  <p>Reached by holding <kbd>Ctrl</kbd> at startup. Operands are comma-separated.</p>
+  <table>
+    <tr><th>Command</th><th>Arguments</th><th>Description</th></tr>
+    <tr><td><code>help</code></td><td>&mdash;</td><td>Prints the command reference.</td></tr>
+    <tr><td><code>image</code></td><td><code>(asm path), (image path)</code></td><td>Assembles a source file and writes the machine-code image to disk.</td></tr>
+    <tr><td><code>load</code></td><td><code>(image path)</code></td><td>Loads a compiled image into VM memory at address 0.</td></tr>
+    <tr><td><code>run</code></td><td><code>[-d] [-fun]</code></td><td>Boots the VM. <code>-d</code> loads the internal hard disk image first; <code>-fun</code> starts the random bit-flopper thread.</td></tr>
+    <tr><td><code>boot</code></td><td><code>(image path)</code></td><td>Loads and immediately boots a specific image file.</td></tr>
+    <tr><td><code>erase</code></td><td>&mdash;</td><td>Zero-fills the virtual hard disk file.</td></tr>
+    <tr><td><code>packrun</code></td><td><code>(asm path)</code></td><td>Assembles a source file and boots it directly without writing an image to disk.</td></tr>
+    <tr><td><code>update</code></td><td>&mdash;</td><td>Recompiles the BIOS from source and re-flashes <code>BIOS.rom</code>.</td></tr>
+    <tr><td><code>enabcsm</code></td><td>&mdash;</td><td>Enables the BIOS compatibility shim for future BIOS loads this session.</td></tr>
+    <tr><td><code>launchdbg</code></td><td>&mdash;</td><td><b>New.</b> Launches the debugger GUI on demand, independent of the automatic launch that already happens after the shell exits.</td></tr>
+    <tr><td><code>exit</code></td><td>&mdash;</td><td>Shuts down the VM process.</td></tr>
+  </table>
+  <div class="callout warn">
+    <span class="label">Stale help text</span>
+    The shell's built-in <code>help</code> output still references "OS check flag at 0x0900" and lists
+    interrupt vectors <code>0x0001</code>&ndash;<code>0x0005</code> as if they were hardware built-ins,
+    carried over verbatim from VSK-16A. It does not mention the new keyboard hardware-interrupt vector
+    at <code>0x00EF</code>. Treat the in-shell help text as a rough guide rather than authoritative for
+    VSK-E16A specifics.
+  </div>
+
+  <a class="anchor-target" id="liveshell"></a>
+  <h2><span class="num">15.</span>Live Running Shell (F12)</h2>
+  <p>
+    New in VSK-E16A: a second, entirely separate shell that can be entered <em>while the VM is
+    executing</em>, by pressing <kbd>F12</kbd>. The fetch loop checks for this roughly every 16,384
+    cycles. Entering it clears the screen and takes over the terminal &mdash; the VM's own execution is
+    effectively suspended (the Python thread is inside this input loop) until the shell is exited.
+  </p>
+  <table>
+    <tr><th>Command</th><th>Arguments</th><th>Description</th></tr>
+    <tr><td><code>help</code></td><td>&mdash;</td><td>Prints this shell's command reference.</td></tr>
+    <tr><td><code>exit</code></td><td>&mdash;</td><td>Returns control to the running VM, resuming exactly where it left off.</td></tr>
+    <tr><td><code>write register</code></td><td><code>(reg index) (value)</code></td><td>Directly overwrites a general-purpose register.</td></tr>
+    <tr><td><code>write rSP</code></td><td><code>(value)</code></td><td>Directly overwrites the stack pointer.</td></tr>
+    <tr><td><code>write rIP</code></td><td><code>(value)</code></td><td>Directly overwrites the instruction pointer.</td></tr>
+    <tr><td><code>write memory</code></td><td><code>(address) (value)</code></td><td>Directly overwrites one word of memory.</td></tr>
+    <tr><td><code>funmode</code></td><td>&mdash;</td><td>Starts the random bit-flopper thread.</td></tr>
+    <tr><td><code>restart</code></td><td>&mdash;</td><td>Resets registers, reloads the disk image and BIOS, and resumes execution from address <code>0x0000</code>.</td></tr>
+  </table>
+  <div class="callout danger">
+    <span class="label">No undo</span>
+    Every <code>write</code> subcommand applies immediately and unconditionally &mdash; there is no
+    confirmation step and no bounds checking beyond a 16-bit mask. Writing an invalid instruction pointer
+    or a corrupt stack pointer here can put the VM into a state indistinguishable from having actually
+    executed bad code, once you exit back to it.
+  </div>
+
+  <a class="anchor-target" id="debugger"></a>
+  <h2><span class="num">16.</span>Debugger GUI</h2>
+  <p>
+    A read-only Tkinter debugger window runs alongside the VM in a background thread, retitled
+    "VSK-E16A Debugger" and widened to accommodate new telemetry. As before, it never mutates VM state on
+    its own &mdash; it only polls and displays it on a timer (default every 250&nbsp;ms).
+  </p>
+  <ul class="clean">
+    <li><b>Registers panel</b> &mdash; all 16 general-purpose registers, plus <code>IP</code>, <code>SP</code>, <code>FLAGS</code>, <b>the new <code>IF</code> readout</b>, <b>the top of the PMIO stack</b>, current cycle count, VM memory usage, host CPU usage, and <b>a new guest clock-speed readout in kHz</b> (measured live by a background thread that samples cycles-per-second once per second).</li>
+    <li><b>Memory panel</b> &mdash; a scrollable hex + ASCII dump of the full 64K-word address space. The line containing the current <code>IP</code> is highlighted in grey, and <b>new in this revision</b>, the exact word at <code>IP</code> within that line is additionally highlighted in red, distinguishing the specific instruction word from the rest of its 16-word row.</li>
+    <li><b>Live decompile toggle</b> &mdash; <b>new</b>: an opt-in checkbox that, when enabled, appends a best-effort disassembly of each visible memory row using the same opcode table the assembler encodes with. It's a heuristic view (it can't reliably distinguish code from data, and does not attempt to fully resolve variable-length operands like <code>LOAD</code> strings), only computed for rows currently on screen, and does not claim correctness on data regions.</li>
+  </ul>
+  <div class="callout">
+    <span class="label">Performance notes</span>
+    Two changes were made purely for responsiveness on larger/longer-running programs: the "words used"
+    percentage is now maintained as a running count refreshed on a slow 2-second background cycle rather
+    than rescanned from all 65,536 words every UI tick, and memory-view redraws are limited to whatever
+    rows are actually scrolled into view rather than reformatting all ~4,096 rows every tick. Neither
+    changes what the debugger reports, only how cheaply it computes it.
+  </div>
+
+  <a class="anchor-target" id="appendix"></a>
+  <h2><span class="num">17.</span>Appendix: Opcode Table</h2>
+  <table>
+    <tr><th>Mnemonic</th><th>Opcode</th><th>Encoded size</th><th>Operand summary</th><th>Status</th></tr>
+    <tr><td><code>HLT</code></td><td>1</td><td>1</td><td>&mdash;</td><td>unchanged</td></tr>
+    <tr><td><code>MOV</code></td><td>4</td><td>5</td><td>mode_a, mode_b, dest, src</td><td>unchanged</td></tr>
+    <tr><td><code>VOUT</code></td><td>8</td><td>1</td><td>&mdash;</td><td>behaviour changed</td></tr>
+    <tr><td><code>ADD</code></td><td>12</td><td>4</td><td>a, b, dest</td><td>unchanged</td></tr>
+    <tr><td><code>SUB</code></td><td>16</td><td>4</td><td>a, b, dest</td><td>unchanged</td></tr>
+    <tr><td><code>MUL</code></td><td>20</td><td>4</td><td>a, b, dest</td><td>unchanged</td></tr>
+    <tr><td><code>DIV</code></td><td>24</td><td>4</td><td>a, b, dest</td><td>unchanged</td></tr>
+    <tr><td><code>JMP</code></td><td>28</td><td>2</td><td>address</td><td>unchanged</td></tr>
+    <tr><td><code>CALL</code></td><td>32</td><td>2</td><td>label address</td><td>unchanged</td></tr>
+    <tr><td><code>RET</code></td><td>36</td><td>1</td><td>&mdash;</td><td>unchanged</td></tr>
+    <tr><td><code>PUSH</code></td><td>40</td><td>2</td><td>reg</td><td>unchanged</td></tr>
+    <tr><td><code>POP</code></td><td>44</td><td>2</td><td>reg</td><td>unchanged</td></tr>
+    <tr><td><code>CMP</code></td><td>48</td><td>3</td><td>reg_a, reg_b</td><td>unchanged</td></tr>
+    <tr><td><code>JE</code></td><td>52</td><td>2</td><td>address</td><td>unchanged</td></tr>
+    <tr><td><code>JNE</code></td><td>56</td><td>2</td><td>address</td><td>unchanged</td></tr>
+    <tr><td><code>DHI</code></td><td>60</td><td>1</td><td>&mdash;</td><td><b>new</b> (was KEY)</td></tr>
+    <tr><td><code>LOAD</code></td><td>64</td><td>2 + len(str) + 1</td><td>reg, inline string, terminator</td><td>unchanged</td></tr>
+    <tr><td><code>INC</code></td><td>68</td><td>2</td><td>reg</td><td>unchanged</td></tr>
+    <tr><td><code>DEC</code></td><td>72</td><td>2</td><td>reg</td><td>unchanged</td></tr>
+    <tr><td><code>NUMP</code></td><td>76</td><td>3</td><td>addr_reg, value_reg</td><td>unchanged</td></tr>
+    <tr><td><code>EHI</code></td><td>78</td><td>1</td><td>&mdash;</td><td><b>new</b> (was DREAD)</td></tr>
+    <tr><td><code>IN</code></td><td>80</td><td>2</td><td>reg</td><td><b>new</b> (was DWRITE)</td></tr>
+    <tr><td><code>INT</code></td><td>82</td><td>2</td><td>vector (must be within IVT)</td><td>unchanged</td></tr>
+    <tr><td><code>JH</code></td><td>84</td><td>2</td><td>address</td><td>unchanged</td></tr>
+    <tr><td><code>JL</code></td><td>86</td><td>2</td><td>address</td><td>unchanged</td></tr>
+    <tr><td><code>CLF</code></td><td>88</td><td>1</td><td>&mdash;</td><td>behaviour changed</td></tr>
+    <tr><td><code>JPTR</code></td><td>90</td><td>2</td><td>reg</td><td>unchanged</td></tr>
+    <tr><td><code>MOVFS</code></td><td>92</td><td>3</td><td>dest, pseudo-reg id</td><td>unchanged</td></tr>
+    <tr><td><code>MOVSP</code></td><td>94</td><td>2</td><td>reg</td><td>unchanged</td></tr>
+    <tr><td><code>OUT</code></td><td>96</td><td>1</td><td>&mdash; (uses R1/R2/R3)</td><td><b>new</b></td></tr>
+    <tr><td><code>SHLT</code></td><td>98</td><td>1</td><td>&mdash;</td><td><b>new</b></td></tr>
+    <tr><td><em>(zero word)</em></td><td>0</td><td>1</td><td>Treated as padding/no-op; skipped.</td><td>unchanged</td></tr>
+  </table>
+  <p class="small">28 opcodes total (27 named mnemonics plus the reserved zero/no-op word). VSK-16A's <code>KEY</code>, <code>DREAD</code>, and <code>DWRITE</code> are removed; <code>DHI</code>, <code>EHI</code>, <code>IN</code>, <code>OUT</code>, and <code>SHLT</code> are new, keeping the total opcode count the same as VSK-16A Rev 7.0 despite the net addition of 2 new opcode slots (96, 98) beyond the 3 reassigned ones.</p>
+
+  <div class="footer-note">
+    VSK-E16A Reference Manual &middot; Revision 1.0 &middot; Generated from the reference emulator source.
+    This document describes emulator behaviour as implemented and may not reflect future revisions.
+    VSK-E16A is a distinct machine from VSK-16A &mdash; consult the VSK-16A manual separately for that
+    architecture.
+  </div>
+
+</main>
+</div>
+</body>
+</html>

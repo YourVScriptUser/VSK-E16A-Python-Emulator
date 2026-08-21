@@ -1,0 +1,1148 @@
+; Official sysrom BIOS for the VSK-E16A
+; Copyright 2026 VSK software
+; Re-distrubuting this source is not allowed
+ 
+; BIOS interrupts:
+ 
+; General Purpose
+; 0x01: Clear keyboard buffer />
+;  No register operands
+ 
+; 0x02: Clear video buffer    />
+;  No register operands
+ 
+; 0x0E: Teletype              />
+;  r0: ascii char
+ 
+; 0x0F: Await enter
+;  No register operands
+ 
+; Hardware
+; 0x10: Disk read             />
+;  r0: disk address
+; Returns the read value in r0
+ 
+; 0x11: Disk write            />
+;  r0: Disk address
+;  r1: Disk value (what to write)
+ 
+; 0x12: Reset                 />
+;  No register operands
+ 
+; Hardware interrupts
+; 0xEF: Keyboard         (mapped by emulator)
+; 0xFF: GPF Fault vector (mapped by emulator)
+ 
+; BIOS sets up a 155-word long keyboard buffer at 0xF000
+; Upon a keyboard-generated hardware interrupt (whilst iF is 1), the BIOS puts the key pressed into the keyboard buffer.
+ 
+; Boot table works the exact same as VBPT but it is now called the BMT (Boot Master Table)
+ 
+; 0x1100: Boot signature (0x55AA)
+; 0x1101: OS entrypoint
+; 0x1102-...: OS string name
+; expects OS string name to be null-terminated
+
+
+
+
+
+%region 0x0000
+; disables hardware interrupts, clears flags, initializes stack and jumps to BIOS runtime
+; this code should eventually get overwritten with 0s during IVT initialization
+dhi
+clf
+mov r0, BIOS_STACK_BASE
+movsp r0
+jmp bios_main
+
+
+
+
+
+
+
+
+; Start bios code at 0x0100 since 0x0000+ contains the earliest init code and the IVT
+%region 0x0100
+; BIOS INTERRUPTS ///
+ 
+;$$far
+; Disable software interrupt mode
+; enable hardware interrupts, clear flags, recover saved registers
+dsimode:
+ 
+  mov r0, R1_SAVE
+  mov r1, [r0]
+ 
+  mov r0, R2_SAVE
+  mov r2, [r0]
+ 
+  mov r0, R3_SAVE
+  mov r3, [r0]
+ 
+  mov r0, R4_SAVE
+  mov r4, [r0]
+ 
+  mov r0, R5_SAVE
+  mov r5, [r0]
+ 
+  mov r0, R6_SAVE
+  mov r6, [r0]
+ 
+  mov r0, R7_SAVE
+  mov r7, [r0]
+ 
+  mov r0, R8_SAVE
+  mov r8, [r0]
+ 
+  mov r0, R9_SAVE
+  mov r9, [r0]
+ 
+  mov r0, R10_SAVE
+  mov r10, [r0]
+ 
+  mov r0, R11_SAVE
+  mov r11, [r0]
+ 
+  mov r0, R12_SAVE
+  mov r12, [r0]
+ 
+  mov r0, R13_SAVE
+  mov r13, [r0]
+ 
+  mov r0, R14_SAVE
+  mov r14, [r0]
+ 
+  mov r0, R15_SAVE
+  mov r15, [r0]
+ 
+  clf
+  ehi
+  ret
+ 
+;$$far
+; Enable software interrupt mode
+; disable hardware interrupts, clear flags, save registers
+; the only register that gets clobbered is r0
+esimode:
+  ; r0 is not saved because r0 is used as the pointer to save
+  ; like using a map to select where to place the map but you dont have a map to map where the map goes
+  ; that was a horrible analogy
+ 
+  ; still preserve r0 as its used as a argument register
+  push r0
+  mov r0, R1_SAVE
+  mov [r0], r1
+ 
+  mov r0, R2_SAVE
+  mov [r0], r2
+ 
+  mov r0, R3_SAVE
+  mov [r0], r3
+ 
+  mov r0, R4_SAVE
+  mov [r0], r4
+ 
+  mov r0, R5_SAVE
+  mov [r0], r5
+ 
+  mov r0, R6_SAVE
+  mov [r0], r6
+ 
+  mov r0, R7_SAVE
+  mov [r0], r7
+ 
+  mov r0, R8_SAVE
+  mov [r0], r8
+ 
+  mov r0, R9_SAVE
+  mov [r0], r9
+ 
+  mov r0, R10_SAVE
+  mov [r0], r10
+ 
+  mov r0, R11_SAVE
+  mov [r0], r11
+ 
+  mov r0, R12_SAVE
+  mov [r0], r12
+ 
+  mov r0, R13_SAVE
+  mov [r0], r13
+ 
+  mov r0, R14_SAVE
+  mov [r0], r14
+ 
+  mov r0, R15_SAVE
+  mov [r0], r15
+  pop r0
+ 
+  dhi
+  clf
+  ret
+
+
+; ISR 0x1
+interrupts.clear_kbuf:
+  call esimode
+  call init_kbuf_kbuf_clear
+  call dsimode
+ 
+  ret
+ 
+; ISR 0x2
+interrupts.clear_vbuf:
+  call esimode
+ 
+  mov r0, VIDEO_MEMORY_BASE
+  mov r1, 0xFFFF
+ 
+  jmp clear_vbuf_loop
+ 
+clear_vbuf_loop:
+  mov [r0], 0
+  inc r0
+ 
+  cmp r1, r0
+  je clear_vbuf_end
+ 
+  jmp clear_vbuf_loop
+ 
+clear_vbuf_end:
+ 
+  vout
+  call dsimode
+  ret
+ 
+; ISR 0x0E
+interrupts.teletype:
+  ; r0 should hold ascii char to print
+  call esimode
+ 
+  call teletype_find_vga_end  ; r3 now holds the end address of video memory
+ 
+  mov [r3], r0                ; memory[end of vga] = ascii char
+ 
+  vout                        ; refresh the display
+  call dsimode
+  ret
+ 
+teletype_find_vga_end:
+  mov r1, 0                 ; CURRENT
+  mov r2, 0                 ; CONST COMPARE END
+ 
+  mov r3, VIDEO_MEMORY_BASE ; VAR POINTER
+  mov r4, 0xFFFF            ; CONST POINTER END
+ 
+  jmp teletype_find_vga_end_loop
+ 
+teletype_find_vga_end_loop:
+  mov r1, [r3]
+  inc r3
+ 
+  cmp r1, r2
+  je teletype_find_vga_end_end
+ 
+  cmp r3, r4
+  je teletype_find_vga_end_end
+ 
+  jmp teletype_find_vga_end_loop
+ 
+teletype_find_vga_end_end:
+  dec r3    ; right now it points after the terminator, we dont want that.
+ 
+  clf
+  ret
+   
+; ISR 0x0F
+interrupts.await_enter:
+  ; hijack the normal keyboard interrupt ISR to a custom one that only returns a single char
+  call esimode
+ 
+  mov r0, KB_INTERRUPT_VECTOR
+  mov r1, hijack_keyboard
+  mov [r0], r1
+ 
+  jmp await_enter_loop
+ 
+await_enter_loop:
+  ehi      ; we want HWIs to work here
+ 
+  shlt     ; spin until a HWI is raised
+           ; HWI vector should point to hijack_keyboard instead of key_interrupt *should*
+ 
+  dhi
+ 
+  ; hijack_keyboard puts the key pressed in r0
+  ; carrige return is ascii 13
+ 
+  mov r1, 13
+  cmp r0, r1
+ 
+  je await_enter_enter_pressed
+ 
+  jmp await_enter_loop
+ 
+await_enter_enter_pressed:
+  ; recover key_interrupt handler
+  mov r0, KB_INTERRUPT_VECTOR
+  mov r1, key_interrupt
+  mov [r0], r1
+ 
+  call dsimode  
+  ret
+ 
+hijack_keyboard:
+  in r0 ; simply just capture the single char and return
+  ret
+ 
+; port   = regs16[1]
+; value  = regs16[2]
+; notify = regs16[3]
+ 
+; ISR 0x10
+interrupts.disk_read:
+  call esimode
+ 
+  ; Disk communication structure (set by emulator):
+  ;  [read_or_write] [address], [value: if write]
+ 
+  ; mode is 1 for write, 0 for read
+  ; Address to read in r0
+  ; Read result returned in r0
+ 
+  ; Step 1: Write ghost value (not used in read mode)
+  mov r1, 0
+  mov r2, 0
+  mov r3, 0
+ 
+  out
+ 
+  ; Step 2: Write address
+  mov r2, r0         ; copy address to out value
+  mov r1, 0          ; port does not matter in no-notify mode
+  mov r3, 0          ; do not notify the device
+ 
+  out        
+ 
+  ; Step 3: write access mode
+  mov r1, 0
+  mov r3, 0        
+  mov r2, 0         ; read_or_write is 0 for read mode
+ 
+  out
+ 
+  ; Step 4: notify the device
+  ; Disk is port 1 (set by emulator)
+ 
+  mov r1, 1
+  mov r3, 1         ; we want to notify the device
+  mov r2, 0         ; read_or_write is 0 for read mode
+ 
+  out
+ 
+  in r0             ; result pushed to PMIO stack, pop it into r0
+ 
+  call dsimode
+  ret
+ 
+; ISR 0x11          
+interrupts.disk_write:
+  call esimode
+ 
+  ; Disk communication structure (set by emulator):
+  ;  [read_or_write] [address], [value: if write]
+ 
+  ; mode is 1 for write, 0 for read
+  ; Address to write in r0
+  ; Value to write in r1
+ 
+  ; Step 1: Write value for write
+  mov r2, r1
+  mov r1, 0
+  mov r3, 0
+ 
+  out
+ 
+  ; Step 2: Write address
+  mov r2, r0         ; copy address to out value
+  mov r1, 0          ; port does not matter in no-notify mode
+  mov r3, 0          ; do not notify the device
+ 
+  out        
+ 
+  ; Step 3: Write access mode
+  mov r1, 0
+  mov r3, 0        
+  mov r2, 1          ; 1 is write mode
+ 
+  out
+  ; Step 4: notify the device
+  ; Disk is port 1 (set by emulator)
+ 
+  mov r1, 1
+  mov r3, 1         ; we want to notify the device
+  mov r2, 0        
+ 
+  out
+ 
+  call dsimode
+  ret
+ 
+; ISR 0x12
+interrupts.power_mode:
+  call esimode
+ 
+  ; Disk communication structure (set by emulator):
+  ;  [mode]
+ 
+  ; Step 1: copy mode
+  mov r1, 0  
+  mov r2, 1
+  mov r3, 0  
+ 
+  out
+ 
+  ; Step 2: notify device
+  mov r1, 2
+  mov r2, 0
+  mov r3, 1
+ 
+  out
+ 
+  call dsimode
+  ret
+
+
+
+
+
+
+
+
+
+; KEYBOARD BUFFER HANDLER //
+ 
+; handler for when a keyboard hardware interrupt is generated
+key_interrupt:
+  ; emulator keyboard device puts the ASCII key pressed at the top of the PMIO stack
+  ; hardware interrupts also push the return pointer to the CPU stack (NOT the PMIO stack!)
+  call esimode
+  dhi                           ; disable hardware interrupts so another interrupt cannot happen whilst already handling an interrupt
+                                ; esimode already does this, kept just in case
+       
+       
+  in r14                        ; pop key pressed off of the PMIO stack
+ 
+  mov r6, 8                     ; backspace check
+  cmp r6, r14                   ; compare using cmp
+  je key_interrupt_backspace    ; jump if equal
+ 
+  mov r12, KBUF_CURSOR          ; read the current keyboard buffer cursor
+  mov r15, [r12]
+       
+  mov r1, KBUF_SIZE             ; Size of the keyboard buffer
+  mov r2, KBUF_BASE             ; Where the buffer starts
+       
+  add r1, r2, r1                ; base address + size = end address (stored in r1)
+       
+  cmp r15, r1                   ; Update flags based on the comparison of r15 & r1
+  jh key_interrupt_overflow     ; if cursor > end address, go to overflow routine
+ 
+  jmp key_interrupt_store_key   ; if not, store the key
+ 
+; stores the key into the keyboard buffer, expects r14 to hold the key and the cursor to be initialized
+key_interrupt_store_key:
+  mov r0, KBUF_CURSOR        ; read cursor address
+  mov r1, [r0]               ; read cursor value
+ 
+  mov [r1], r14              ; write key pressed into keyboard buffer
+ 
+  inc r1                     ; increment cursor
+  mov [r0], r1               ; write back inremented cursor
+ 
+  call dsimode
+  ehi                        ; re-enable interrupts
+  clf
+  ret
+ 
+ 
+; key_interrupt goes here when the keyboard buffer grows past KBUF_SIZE
+key_interrupt_overflow:
+  call init_kbuf_kbuf_clear   ; clear the keyboard buffer
+ 
+  jmp key_interrupt_store_key ; then continue
+ 
+key_interrupt_backspace:
+  ; read current cursor, erase the value, decrease the cursor, dont decrease if already at bottom
+ 
+  mov r0, KBUF_CURSOR
+  mov r1, [r0]
+ 
+  mov r2, KBUF_BASE
+  cmp r2, r1
+  je key_interrupt_backspace_ignore
+ 
+  dec r1
+  mov [r1], 0
+ 
+  mov r0, KBUF_CURSOR
+  mov [r0], r1
+ 
+  jmp key_interrupt_backspace_ignore  ; can also still jump here even if it was a valid backspace.
+                                      ; all it does is return.
+ 
+key_interrupt_backspace_ignore:
+  call dsimode
+  ehi
+  clf
+  ret
+ 
+;$$far
+; Main initialization code for the keyboard buffer.
+init_kbuf:
+  ; Initialize buffer cursor
+  mov r0, KBUF_CURSOR
+  mov r1, KBUF_BASE
+  mov [r0], r1
+ 
+  ; clear buffer space
+  call init_kbuf_kbuf_clear
+ 
+  ; setup interrupt ISR
+  mov r0, KB_INTERRUPT_VECTOR
+  mov r1, key_interrupt
+  mov [r0], r1
+ 
+  ; done, return
+  ; keyboard buffer should now be ready to take interrupts
+  ret
+ 
+ 
+; Sets [0xF000+155] to 0
+init_kbuf_kbuf_clear:
+ 
+  ; 0xF000 + 155 to get end address
+  mov r1, KBUF_BASE
+  mov r2, KBUF_SIZE
+ 
+  add r1, r2, r0           ; r0 = CONST END ADDRESS
+ 
+  mov r1, KBUF_BASE        ; r1 = VAR POINTER
+ 
+  jmp init_kbuf_kbuf_clear_loop
+   
+init_kbuf_kbuf_clear_loop:
+  mov [r1], 0
+  inc r1
+ 
+  cmp r1, r0
+  jh init_kbuf_kbuf_clear_end
+  clf
+ 
+  jmp init_kbuf_kbuf_clear_loop
+ 
+init_kbuf_kbuf_clear_end:
+  mov r0, KBUF_CURSOR
+  mov r1, KBUF_BASE
+  mov [r0], r1      ; reset the buffer cursor to the start of the keyboard buffer
+ 
+  clf
+  ret
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; MAIN BIOS //
+ 
+; Temporary keyboard hardware interrupt handler for run_memory_test
+; Bins the key pressed and tells the memory test to exit early
+mem_test_skip_isr:
+  ; get rid of the key pressed, we dont need that.
+ 
+  push r0
+  in r0
+  pop r0
+  ; also get rid of the return pointer for the hardware interrupt
+  pop r0  
+ 
+  ; return early
+  jmp run_memory_test_loop_end
+ 
+; Runs a memory test (reads from every address) and prints it as it goes.
+run_memory_test:
+  ; make a temporary isr
+  mov r0, mem_test_skip_isr
+  mov [0x00EF], r0
+ 
+  mov r10, memtest_cursor_rollback_region
+  mov [r10], r14       ; r14 = video cursor
+  sub r0, r0, r0       ; (r0=0) current test read
+ 
+  ; r1 = read scratch
+  mov r2, 0xFFFF       ; end address
+  jmp run_memory_test_loop
+ 
+run_memory_test_loop:
+  mov r1, [r0]
+ 
+  inc r0
+ 
+  mov r10, memtest_cursor_rollback_region
+  mov r14, [r10]
+ 
+  mov r10, memtest_print_scratch
+ 
+  nump r10, r0
+ 
+  push r0
+  push r1
+  push r2
+ 
+  mov r1, r10
+  call print
+ 
+  mov r1, K_SUFFIX
+  call print
+ 
+  pop r2
+  pop r1
+  pop r0
+ 
+  mov r10, memtest_cursor_rollback_region
+  mov r14, [r10]
+ 
+  cmp r2, r0
+  je run_memory_test_loop_end
+  clf
+ 
+  jmp run_memory_test_loop_check_key
+ 
+; Checks if any key is pressed at this current time
+; This runs before the keyboard buffer is initialized
+; simply use a custom IVT before the main one starts (initialized with init_kbuf)
+run_memory_test_loop_check_key:
+  ehi  ; enable hwis
+  dhi  ; disable hwis
+ 
+  ; if a user presses a key, it will be caught here and the custom isr will
+  ; bin the key pressed and return
+ 
+  ; no interrupt happened, go back
+ 
+  jmp run_memory_test_loop
+ 
+run_memory_test_loop_end:
+ 
+  ; move the cursor to the next available slot (0) in the video buffer
+  call mem_test_find_end
+  mov r0, VIDEO_MEMORY_BASE
+  add r0, r4, r0
+ 
+  mov r14, r0
+ 
+  ; print a newline
+  call newline
+  ; infact, print two
+  call newline
+  ; i concur.
+ 
+  ; make sure interrupts are disabled
+  dhi
+ 
+  ; bin the temporary keyboard isr
+  mov [0x00EF], 0
+ 
+ 
+  clf
+  ret
+ 
+mem_test_find_end:
+  mov r1, VIDEO_MEMORY_BASE  
+  mov r4, 0          
+  mov r2, 0        
+  mov r3, 0      
+  jmp mem_test_find_end_loop
+ 
+mem_test_find_end_loop:
+  mov r2, [r1]
+  cmp r3, r2
+  je mem_test_find_end_end
+ 
+  inc r1
+  inc r4
+  jmp mem_test_find_end_loop
+ 
+ 
+ 
+mem_test_find_end_end:
+  clf
+  ret
+ 
+; Used to print the current word being tested
+memtest_print_scratch:
+%defineword 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+; alot longer than it needs to be but lets play it safe since nump does not write a terminator
+ 
+; Used by run_memory_test to save the starting video cursor to print numbers on the same line.
+memtest_cursor_rollback_region:
+  %defineword 0
+ 
+ 
+; Prints the OS name stored in the BMT
+PRINT_BMT_OS_NAME:
+  mov r1, STRING_OS
+  call print
+ 
+  mov r1, BMT_TABLE_STRING_ADDRESS
+  call print
+ 
+  call newline
+ 
+  ret
+ 
+; Validates that the VBPT table exists
+; Goes to no os handler if not
+; puts OS entrypoint in r12 and returns if there is
+VALIDATE_BMT:
+  ; puts the entrypoint in r12
+ 
+  ; check for boot signature
+  mov r2, 0x55AA
+  mov r1, BMT_TABLE_ADDRESS
+  mov r3, [r1]
+  cmp r2, r3
+  jne no_os
+ 
+  ; read OS entrypoint
+  mov r1, BMT_TABLE_ENTRYPOINT_ADDRESS
+  mov r12, [r1]
+ 
+  ; return
+  ret
+ 
+; Prints a newline
+newline:
+  mov [r14], 10
+  inc r14
+ 
+  vout
+  ret
+ 
+; BIOS print routine
+; String address stored in r1
+; Expects r14 to be initialized to a video cursor
+print:
+  mov r2, 0 ; VAR CURRENT BYTE
+  mov r3, 0 ; CONST NULL TERMINATOR
+  mov r4, 0xFFFF ; CONST END
+  mov r9, r1
+  call _read
+  ret
+ 
+_read:
+ 
+  ; Detect null termination
+  mov r2, [r1]
+  cmp r2, r3
+  je _end_print
+ 
+  ; Write string into screen memory
+  mov [r14], r2
+  inc r14
+  inc r1
+  jmp _read
+ 
+_end_print:
+ 
+  clf  
+  vout
+  ret
+
+
+; Initializes the video cursor.
+init_early_video:
+  mov r14, VIDEO_MEMORY_BASE
+ 
+  ret
+ 
+; Jumped to when no os is found
+no_os:
+  ; at this point the video cursor still points at the end of the boot table message
+  mov r1, STRING_NOT_PRESENT
+  call print
+ 
+  call pause
+  call pause
+ 
+  mov r14, VIDEO_MEMORY_BASE
+ 
+  mov r1, STRING_INFO
+  call print
+ 
+  call newline
+  call newline
+ 
+  mov r1, STRING_NO_OS
+  call print
+ 
+  int 0x0F
+ 
+  hlt
+ 
+;$$far
+; zeroes vector table and fills it with ISRs
+init_ivt:
+  call init_ivt_clr
+ 
+  mov r0, interrupts.clear_kbuf
+  mov [0x0001], r0
+ 
+  mov r0, interrupts.clear_vbuf
+  mov [0x0002], r0
+ 
+  mov r0, interrupts.teletype
+  mov [0x000E], r0
+ 
+  mov r0, interrupts.await_enter
+  mov [0x000F], r0
+ 
+  mov r0, interrupts.disk_read
+  mov [0x0010], r0
+ 
+  mov r0, interrupts.disk_write
+  mov [0x0011], r0
+ 
+  mov r0, interrupts.power_mode
+  mov [0x0012], r0
+ 
+  ret
+ 
+init_ivt_clr:
+  mov r0, 0x0000
+  mov r1, 0x00DF
+  jmp init_ivt_clr_loop
+ 
+init_ivt_clr_loop:
+  mov [r0], 0
+  inc r0
+  cmp r0, r1
+  je init_ivt_clr_loop_end
+  jmp init_ivt_clr_loop
+ 
+init_ivt_clr_loop_end:
+  clf
+  ret
+ 
+ 
+;$$far
+; main bios runtime
+; sets up everything
+bios_main:
+  dhi ; Disable interrupts, they are not allowed during main BIOS initialization
+  call init_early_video
+ 
+  mov r1, STRING_BIOS_BANNER
+  call print
+ 
+  call newline
+  call newline
+ 
+  mov r1, STRING_MEM_TEST
+  call print
+ 
+  call run_memory_test
+ 
+  mov r1, STRING_HARDWARE_INIT
+  call print
+ 
+  call init_kbuf
+ 
+  mov r1, STRING_DONE
+  call print
+ 
+  call newline
+ 
+  mov r1, STRING_INTERRUPT_INIT
+  call print
+ 
+  call init_ivt
+ 
+  mov r1, STRING_DONE
+  call print
+ 
+  call newline
+ 
+  mov r1, STRING_BOOT_INIT
+  call print
+ 
+  call VALIDATE_BMT
+ 
+  mov r1, STRING_DONE
+  call print
+ 
+  call newline
+ 
+  ; If validate_bmt returns, it means a OS was found and the entrypoint is in r12.
+ 
+  push r12
+  call PRINT_BMT_OS_NAME
+  call pause
+  call pause
+  call pause
+ 
+  call newline
+  call newline
+ 
+  mov r14, VIDEO_MEMORY_BASE
+
+
+  mov r1, STRING_INFO
+  call print
+ 
+  call pause
+  call pause
+  call pause
+ 
+  call newline
+ 
+  pop r12
+  ; setup a clean state for the OS
+  sub r0, r0, r0
+  sub r1, r1, r1
+  sub r2, r2, r2
+  sub r3, r3, r3
+  sub r4, r4, r4
+  sub r5, r5, r5
+  sub r6, r6, r6
+  sub r7, r7, r7
+  sub r8, r8, r8
+  sub r9, r9, r9
+  sub r10, r10, r10
+  sub r11, r11, r11
+  ; don't clear r12, thats the entrypoint! Dingus!
+  sub r13, r13, r13
+  sub r14, r14, r14
+  sub r15, r15, r15
+ 
+  clf
+  ehi
+  int 0x02
+ 
+  jptr r12
+ 
+  hlt ; unreachable. Just in case.
+ 
+;$$far  
+; Spin the CPU for a moment
+pause:
+  mov r10, 0
+  mov r13, 0xFFFF
+  jmp _awloop
+ 
+_awloop:
+  inc r10
+  cmp r10, r13
+  mov [0xFFFF], 0
+  mov [0xFFFF], 0
+  mov [0xFFFF], 0
+  je _finish
+  jmp _awloop
+ 
+_finish:
+  ret
+ 
+R0_SAVE:
+%defineword 0
+ 
+R1_SAVE:
+%defineword 0
+ 
+R2_SAVE:
+%defineword 0
+ 
+R3_SAVE:
+%defineword 0
+ 
+R4_SAVE:
+%defineword 0
+ 
+R5_SAVE:
+%defineword 0
+ 
+R6_SAVE:
+%defineword 0
+ 
+R7_SAVE:
+%defineword 0
+ 
+R8_SAVE:
+%defineword 0
+ 
+R9_SAVE:
+%defineword 0
+ 
+R10_SAVE:
+%defineword 0
+ 
+R11_SAVE:
+%defineword 0
+ 
+R12_SAVE:
+%defineword 0
+ 
+R13_SAVE:
+%defineword 0
+ 
+R14_SAVE:
+%defineword 0
+ 
+R15_SAVE:
+%defineword 0
+
+
+
+
+
+
+
+
+; STRINGS //
+ 
+; Emulator colors:
+; 130: RED
+; 131: GREEN
+; 132: BLUE
+; 133: GREY
+; 134: CYAN
+; 135: BACKGROUND RED
+; 136: RESET
+ 
+STRING_BIOS_BANNER:
+%defineword 134, "VSK sysROM BIOS v1.4.1", 10
+%defineword      "VSK-E16A PROPRIETARY ROM BIOS", 10, 10
+%defineword      "Copyright (c) VSK Software 2026. All rights reserved.", 136, 0
+ 
+STRING_HARDWARE_INIT:
+%defineword 133, "Initializing hardware...", 0
+ 
+STRING_INTERRUPT_INIT:
+%defineword 133, "Initializing interrupts...", 0
+ 
+STRING_BOOT_INIT:
+%defineword 133, "Reading boot tables...", 0
+ 
+K_SUFFIX:
+%defineword 133, "K", 0
+ 
+STRING_DONE:
+%defineword 133, " done", 0
+ 
+STRING_NOT_PRESENT:
+%defineword 133, " not present", 0
+ 
+STRING_MEM_TEST:
+%defineword 133, "Press any key to skip memory test", 10, "Memory Test... ", 0
+ 
+STRING_NO_OS:
+%defineword 130, "Bootable operating system not found.", 133, 10, 10
+%defineword      "Press enter to continue", 0
+ 
+STRING_OS:
+%defineword 133, "OS found: ", 0
+ 
+STRING_INFO:
+%defineword 134, "INTERRUPT VECTOR TABLE   ",     10
+%defineword      "-----------------------  ",     10
+%defineword 133, "VECTOR  TYPE   FUNCTION  ",     10
+%defineword      "01      SW     CLR KBUF  ",     10
+%defineword      "02      SW     CLR VIDEO ",     10
+%defineword      "0E      SW     TTY OUT   ",     10
+%defineword      "0F      SW     WAIT ENTER",     10
+%defineword      "10      SW     DISK READ ",     10
+%defineword      "11      SW     DISK WRITE",     10
+%defineword      "12      SW     POWER CYCL",     10
+%defineword      "EF      HW     KEYBOARD  ",     10
+%defineword      "FF      HW     GPF       ",     10,10
+ 
+%defineword 134, "IO  DEVICES      ", 10
+%defineword      "-----------------", 10
+%defineword 133, "PORT      DEVICE ", 10
+%defineword      "1         STORAGE", 10
+%defineword      "2         POWER MGR"
+ 
+%defineword 10, 10
+%defineword 134, "BIOS MEMORY ALLOCATION",                   133, 10
+%defineword      "[0x0000+0x10FF] BIOS RESERVED ",           10
+%defineword      "[0x10FF+0xDF00] FREE          ",           10
+%defineword      "[0xF000+0x009B] KEYBOARD      ",           10
+%defineword      "[0xF100+0x0F00] VIDEO         ",           10
+ 
+%defineword 0
+
+
+
+
+
+
+
+
+
+
+; MARKERS //
+%region 0xEFFF
+;$$far
+; Address of the keyboard buffer pointer
+KBUF_CURSOR:
+ 
+%region 0xF000
+;$$far
+; Where the keyboard buffer starts
+KBUF_BASE:
+ 
+%region 155
+;$$far
+; Size of the keyboard buffer
+KBUF_SIZE:
+ 
+%region 0x10EE
+;$$far
+; BIOS stack space base pointer
+BIOS_STACK_BASE:
+ 
+%region 0x00EF
+;$$far
+; Keyboard hardware interrupt ISR number
+; Mapped by the emulator
+KB_INTERRUPT_VECTOR:
+ 
+%region 0xF100
+;$$far
+; Points to the start address of video ram
+VIDEO_MEMORY_BASE:
+ 
+%region 0x1100
+;$$far
+; Points to the start of the BMT table
+BMT_TABLE_ADDRESS:
+ 
+%region 0x1101
+;$$far
+; Points to the location of the entrypoint in the BMT table (if it exists)
+BMT_TABLE_ENTRYPOINT_ADDRESS:
+ 
+%region 0x1102
+;$$far
+; Points to the location of the OS string name in the BMT table (if it exists)
+BMT_TABLE_STRING_ADDRESS:

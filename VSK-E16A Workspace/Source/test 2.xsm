@@ -1,0 +1,50 @@
+; A test for the new BIOS that prints what you type with newlines when you press enter
+
+; BMT
+%region 0x1100
+%defineword 0x55AA
+%defineword 0x1200
+%defineword "Input test", 0
+
+%region 0x1200
+int 0x02
+mov r14, VIDEO_BASE
+
+carriege_return:
+  mov [r14], 10
+  inc r14
+
+  jmp print_loop
+
+print_loop:
+  push r14
+  vout
+  clf
+  ehi
+  shlt ; wait for HWI
+  dhi
+  pop r14
+
+  mov r0, KBUF_CURSOR
+  mov r1, [r0]
+  dec r1
+
+  mov r2, [r1]
+  mov r3, 13
+  cmp r3, r2
+  je carriege_return
+
+  mov [r14], r2
+  inc r14
+ 
+  jmp print_loop
+
+
+
+
+
+%region 0xEFFF
+KBUF_CURSOR:
+
+%region 0xF100
+VIDEO_BASE:
