@@ -1,6 +1,5 @@
 ; Official sysrom BIOS for the VSK-E16A
-; Copyright 2026 VSK software
-; Re-distrubuting this source is not allowed
+; Copyright under AGPL 3
  
 ; BIOS interrupts:
  
