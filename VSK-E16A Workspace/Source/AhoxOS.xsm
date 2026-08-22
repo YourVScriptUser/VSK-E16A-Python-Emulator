@@ -315,7 +315,7 @@ free_video:
   mov r0, VGA_START
   add r0, r4, r4
  
-  vout
+  
   ret
  
 print_process_table:
@@ -941,7 +941,7 @@ wait_enter_pressed_backspace:
  
   dec r13
   mov [r13], 0
-  vout
+  
  
   jmp wait_enter_pressed
  
@@ -977,7 +977,7 @@ wait_enter_pressed:
  
   mov [r13], r2
  
-  vout
+  
  
   inc r13
  
@@ -1251,6 +1251,7 @@ exit_command:
   jmp exit_command ; you are 101% not getting here but its here just in case
  
 reboot_command:
+  int 0x02
   int 0x12
  
  
@@ -1377,7 +1378,7 @@ write_bytes:
 end:
   ; refresh display hardware and return from syscall
  
-  vout
+  
   jmp return_syscall
  
 overflow:
@@ -1620,7 +1621,7 @@ raise_kernel_panic:
   call no_color
   call panic_newline
   load r4, "Generating crash dump ..."
-  vout
+  
   call panic_newline
   load r4, "error:"
   call panic_space
@@ -1753,12 +1754,12 @@ raise_kernel_panic:
  
   load r4, "Generating fault segment ..."
   call panic_newline
-  vout
+  
   load r4, "Faulting segment:"
   call panic_newline
   call panic_print_code_segment
  
-  vout
+  
  
   call panic_newline
   call panic_newline
@@ -1768,7 +1769,7 @@ raise_kernel_panic:
   ; loop through and print every stack value until we hit 0
   call panic_print_call_stack
  
-  vout
+  
   hlt ; end the choas
  
 color_red_bg:

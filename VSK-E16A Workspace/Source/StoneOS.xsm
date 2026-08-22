@@ -1,0 +1,391 @@
+; === vskcc generated program ===
+; === BMT (Boot Master Table) header, read by the BIOS at boot ===
+%REGION 0x1100
+%DEFINEWORD 21930
+%REGION 0x1101
+%DEFINEWORD 4418
+%REGION 0x1102
+%DEFINEWORD 84,101,115,116,105,110,103,0
+
+; boot: set up stack pointer, then jump to compiled main()
+%REGION 0x1142
+MOV r14, 57344
+MOVSP r14
+; global initializers
+MOV [32768], 65
+MOV [32769], 99
+MOV r0, 0
+CALL main
+HLT
+
+; === __printf(argcount, fmt_addr, args...) runtime ===
+; scans fmt for % specifiers, consuming one stack arg per specifier
+__printf:
+PUSH r15
+MOVFS r15, rSP
+MOV r0, 0
+PUSH r0
+PUSH r0
+PUSH r0
+; argcount is always at r15+2 (pushed last, closest to return addr)
+MOV r1, 2
+ADD r15, r1, r2
+MOV r3, [r2]
+PUSH r3
+; compute the ADDRESS of the fmt_addr slot: r15 + (N + 3)
+MOV r1, 3
+ADD r3, r1, r2
+ADD r15, r2, r2
+MOV r4, [r2]
+MOV r8, 1
+SUB r15, r8, r9
+MOV [r9], r4
+; next arg slot address = (fmt_addr slot address) - 1; decrements per vararg fetched
+MOV r1, 1
+SUB r2, r1, r4
+MOV r8, 3
+SUB r15, r8, r9
+MOV [r9], r4
+; video cursor starts at VIDEO_BASE
+MOV r4, 61696
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r4
+L_printf_loop_1:
+MOV r8, 1
+SUB r15, r8, r9
+MOV r5, [r9]
+MOV r6, [r5]
+MOV r1, 0
+CMP r6, r1
+JE L_printf_done_2
+MOV r1, 37
+CMP r6, r1
+JNE L_printf_not_pct_3
+MOV r8, 1
+SUB r15, r8, r9
+MOV r5, [r9]
+INC r5
+MOV r8, 1
+SUB r15, r8, r9
+MOV [r9], r5
+MOV r7, [r5]
+MOV r8, 1
+SUB r15, r8, r9
+MOV [r9], r5
+MOV r1, 100
+CMP r7, r1
+JE L_printf_spec_d_4
+MOV r1, 99
+CMP r7, r1
+JE L_printf_spec_c_5
+MOV r1, 115
+CMP r7, r1
+JE L_printf_spec_s_6
+MOV r1, 120
+CMP r7, r1
+JE L_printf_spec_x_7
+MOV r1, 37
+CMP r7, r1
+JE L_printf_spec_pct_8
+JMP L_printf_spec_default_9
+L_printf_spec_d_4:
+MOV r8, 3
+SUB r15, r8, r9
+MOV r4, [r9]
+MOV r2, [r4]
+MOV r1, 1
+SUB r4, r1, r4
+MOV r8, 3
+SUB r15, r8, r9
+MOV [r9], r4
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+NUMP r3, r2
+MOV r7, r2
+MOV r6, 0
+MOV r1, 0
+CMP r7, r1
+JE L_printf_dlen_zerocase_14
+L_printf_dlen_loop_12:
+MOV r1, 0
+CMP r7, r1
+JE L_printf_dlen_done_13
+MOV r1, 10
+DIV r7, r1, r7
+INC r6
+JMP L_printf_dlen_loop_12
+L_printf_dlen_zerocase_14:
+MOV r6, 1
+L_printf_dlen_done_13:
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+ADD r3, r6, r3
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r3
+JMP L_printf_after_spec_10
+L_printf_spec_c_5:
+MOV r8, 3
+SUB r15, r8, r9
+MOV r4, [r9]
+MOV r2, [r4]
+MOV r1, 1
+SUB r4, r1, r4
+MOV r8, 3
+SUB r15, r8, r9
+MOV [r9], r4
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+MOV [r3], r2
+INC r3
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r3
+JMP L_printf_after_spec_10
+L_printf_spec_s_6:
+MOV r8, 3
+SUB r15, r8, r9
+MOV r4, [r9]
+MOV r2, [r4]
+MOV r1, 1
+SUB r4, r1, r4
+MOV r8, 3
+SUB r15, r8, r9
+MOV [r9], r4
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+L_printf_scopy_15:
+MOV r4, [r2]
+MOV r1, 0
+CMP r4, r1
+JE L_printf_scopy_done_16
+MOV [r3], r4
+INC r2
+INC r3
+JMP L_printf_scopy_15
+L_printf_scopy_done_16:
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r3
+JMP L_printf_after_spec_10
+L_printf_spec_x_7:
+MOV r8, 3
+SUB r15, r8, r9
+MOV r4, [r9]
+MOV r2, [r4]
+MOV r1, 1
+SUB r4, r1, r4
+MOV r8, 3
+SUB r15, r8, r9
+MOV [r9], r4
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+MOV r4, r2
+MOV r1, 16
+DIV r4, r1, r4
+MOV r1, 16
+DIV r4, r1, r4
+MOV r1, 16
+DIV r4, r1, r4
+MOV r1, 16
+DIV r4, r1, r6
+MOV r1, 16
+MUL r6, r1, r6
+SUB r4, r6, r4
+MOV r1, 10
+CMP r4, r1
+JL L_hexdig_lo_17
+MOV r1, 55
+ADD r4, r1, r4
+JMP L_hexdig_done_18
+L_hexdig_lo_17:
+MOV r1, 48
+ADD r4, r1, r4
+L_hexdig_done_18:
+MOV [r3], r4
+INC r3
+MOV r4, r2
+MOV r1, 16
+DIV r4, r1, r4
+MOV r1, 16
+DIV r4, r1, r4
+MOV r1, 16
+DIV r4, r1, r6
+MOV r1, 16
+MUL r6, r1, r6
+SUB r4, r6, r4
+MOV r1, 10
+CMP r4, r1
+JL L_hexdig_lo_19
+MOV r1, 55
+ADD r4, r1, r4
+JMP L_hexdig_done_20
+L_hexdig_lo_19:
+MOV r1, 48
+ADD r4, r1, r4
+L_hexdig_done_20:
+MOV [r3], r4
+INC r3
+MOV r4, r2
+MOV r1, 16
+DIV r4, r1, r4
+MOV r1, 16
+DIV r4, r1, r6
+MOV r1, 16
+MUL r6, r1, r6
+SUB r4, r6, r4
+MOV r1, 10
+CMP r4, r1
+JL L_hexdig_lo_21
+MOV r1, 55
+ADD r4, r1, r4
+JMP L_hexdig_done_22
+L_hexdig_lo_21:
+MOV r1, 48
+ADD r4, r1, r4
+L_hexdig_done_22:
+MOV [r3], r4
+INC r3
+MOV r4, r2
+MOV r1, 16
+DIV r4, r1, r6
+MOV r1, 16
+MUL r6, r1, r6
+SUB r4, r6, r4
+MOV r1, 10
+CMP r4, r1
+JL L_hexdig_lo_23
+MOV r1, 55
+ADD r4, r1, r4
+JMP L_hexdig_done_24
+L_hexdig_lo_23:
+MOV r1, 48
+ADD r4, r1, r4
+L_hexdig_done_24:
+MOV [r3], r4
+INC r3
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r3
+JMP L_printf_after_spec_10
+L_printf_spec_pct_8:
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+MOV r4, 37
+MOV [r3], r4
+INC r3
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r3
+JMP L_printf_after_spec_10
+L_printf_spec_default_9:
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+MOV r4, 37
+MOV [r3], r4
+INC r3
+MOV [r3], r7
+INC r3
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r3
+JMP L_printf_after_spec_10
+L_printf_not_pct_3:
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+MOV [r3], r6
+INC r3
+MOV r8, 2
+SUB r15, r8, r9
+MOV [r9], r3
+JMP L_printf_emit_char_11
+L_printf_emit_char_11:
+MOV r8, 1
+SUB r15, r8, r9
+MOV r5, [r9]
+INC r5
+MOV r8, 1
+SUB r15, r8, r9
+MOV [r9], r5
+JMP L_printf_loop_1
+L_printf_after_spec_10:
+MOV r8, 1
+SUB r15, r8, r9
+MOV r5, [r9]
+INC r5
+MOV r8, 1
+SUB r15, r8, r9
+MOV [r9], r5
+JMP L_printf_loop_1
+L_printf_done_2:
+MOV r8, 2
+SUB r15, r8, r9
+MOV r3, [r9]
+MOV r4, 0
+MOV [r3], r4
+VOUT
+MOVSP r15
+POP r15
+RET
+
+; === function main ===
+main:
+PUSH r15
+MOVFS r15, rSP
+MOV r0, L_str_26
+PUSH r0
+MOV r0, [32768]
+PUSH r0
+MOV r0, [32769]
+PUSH r0
+MOV r0, [32769]
+PUSH r0
+MOV r0, 3
+PUSH r0
+CALL __printf
+POP r6
+POP r6
+POP r6
+POP r6
+POP r6
+MOV r0, L_str_27
+PUSH r0
+MOV r0, 0
+PUSH r0
+CALL __printf
+POP r6
+POP r6
+MOV r0, 0
+JMP L_main_epilogue_25
+L_main_epilogue_25:
+MOVSP r15
+POP r15
+RET
+
+
+; === data region: globals ===
+%REGION 0x8000
+%REGION 0x8000
+; global letter : char
+%DEFINEWORD 0
+%REGION 0x8001
+; global number : int
+%DEFINEWORD 0
+
+; === string literal pool ===
+L_str_26:
+%DEFINEWORD 76,101,116,116,101,114,32,105,115,58,32,37,99,44,32,78,117,109,98,101,114,32,105,115,58,32,37,100,44,32,78,117,109,98,101,114,32,105,110,32,104,101,120,32,48,120,37,120,0
+L_str_27:
+%DEFINEWORD 10,121,101,115,115,105,114,0

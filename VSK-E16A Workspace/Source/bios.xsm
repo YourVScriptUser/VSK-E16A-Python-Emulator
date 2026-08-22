@@ -1,5 +1,6 @@
 ; Official sysrom BIOS for the VSK-E16A
-; Copyright under AGPL 3
+; Copyright 2026 VSK software
+; Re-distrubuting this source is not allowed
  
 ; BIOS interrupts:
  
@@ -210,7 +211,7 @@ clear_vbuf_loop:
  
 clear_vbuf_end:
  
-  vout
+  
   call dsimode
   ret
  
@@ -223,7 +224,6 @@ interrupts.teletype:
  
   mov [r3], r0                ; memory[end of vga] = ascii char
  
-  vout                        ; refresh the display
   call dsimode
   ret
  
@@ -565,6 +565,53 @@ init_kbuf_kbuf_clear_end:
 
 ; MAIN BIOS //
  
+HEX_DIGITS:
+  %defineword 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46
+
+HEX_SCRATCH:
+  %defineword 0, 0, 0, 0, 0, 0, 0
+
+
+; Prints r0 in hex.
+hex_r0:
+  ;#far
+  mov r1, HEX_SCRATCH
+  mov [r1], 0x30       ; '0'
+  inc r1
+  mov [r1], 0x78       ; 'x'
+  inc r1               ; r1 now points at first hex digit slot
+ 
+  mov r2, r0            ; r2 = working copy of the value
+  mov r3, 4096           ; r3 = current divisor (starts at nibble 3, bits 12-15)
+ 
+hex_nibble_loop:
+  div r2, r3, r4        ; r4 = r2 / r3        (this nibble's value, 0-15)
+  mul r4, r3, r5        ; r5 = r4 * r3        (that nibble's place value)
+  sub r2, r5, r2        ; r2 = r2 - r5        (remove nibble from remainder)
+ 
+  ; look up ascii char for r4 in HEX_DIGITS table
+  mov r6, HEX_DIGITS
+  add r6, r4, r6         ; r6 = HEX_DIGITS + r4  (address of digit char)
+  mov r6, [r6]            ; r6 = the actual ascii char
+ 
+  mov [r1], r6
+  inc r1
+ 
+  ; move to next nibble: r3 = r3 / 16
+  mov r7, 16
+  div r3, r7, r3
+ 
+  mov r7, 0
+  cmp r3, r7
+  jne hex_nibble_loop
+ 
+  mov [r1], 0            ; null terminate "0xNNNN"
+ 
+  mov r1, HEX_SCRATCH
+  call print
+ 
+  ret
+
 ; Temporary keyboard hardware interrupt handler for run_memory_test
 ; Bins the key pressed and tells the memory test to exit early
 mem_test_skip_isr:
@@ -612,7 +659,7 @@ run_memory_test_loop:
   mov r1, r10
   call print
  
-  mov r1, K_SUFFIX
+  mov r1, STRING_K_SUFFIX
   call print
  
   pop r2
@@ -698,14 +745,27 @@ memtest_print_scratch:
 memtest_cursor_rollback_region:
   %defineword 0
  
- 
+;$$far 
 ; Prints the OS name stored in the BMT
+; Expects OS entrypoint to be in r12
 PRINT_BMT_OS_NAME:
   mov r1, STRING_OS
   call print
  
+  mov r1, STRING_QUOTE
+  call print
+
   mov r1, BMT_TABLE_STRING_ADDRESS
   call print
+
+  mov r1, STRING_QUOTE
+  call print
+
+  mov r1, STRING_AT
+  call print
+
+  mov r0, r12
+  call hex_r0
  
   call newline
  
@@ -736,9 +796,10 @@ newline:
   mov [r14], 10
   inc r14
  
-  vout
+  
   ret
  
+;$$far
 ; BIOS print routine
 ; String address stored in r1
 ; Expects r14 to be initialized to a video cursor
@@ -766,7 +827,7 @@ _read:
 _end_print:
  
   clf  
-  vout
+  
   ret
 
 
@@ -801,33 +862,112 @@ no_os:
   hlt
  
 ;$$far
-; zeroes vector table and fills it with ISRs
+; zeroes non-hw vector table slots and then fills the zeroed slots with ISRs
+; prints status messages along the way, halts if a pointer write failed
 init_ivt:
   call init_ivt_clr
- 
+
+  call newline
+
+  mov r1, STRING_ISR_KBUF
+  call print
   mov r0, interrupts.clear_kbuf
   mov [0x0001], r0
- 
+  call pause
+  mov r2, [0x0001]
+  cmp r0, r2
+  jne init_ivt_fail
+
+  mov r1, STRING_DONE
+  call print
+  call newline
+
+  mov r1, STRING_ISR_VBUF
+  call print
   mov r0, interrupts.clear_vbuf
   mov [0x0002], r0
- 
+  call pause
+  mov r2, [0x0002]
+  cmp r0, r2
+  jne init_ivt_fail
+
+  mov r1, STRING_DONE
+  call print
+  call newline
+
+  mov r1, STRING_ISR_TTY
+  call print
   mov r0, interrupts.teletype
   mov [0x000E], r0
- 
+  call pause
+  mov r2, [0x000E]
+  cmp r0, r2
+  jne init_ivt_fail
+
+  mov r1, STRING_DONE
+  call print
+  call newline
+
+  mov r1, STRING_ISR_AWAIT
+  call print
   mov r0, interrupts.await_enter
   mov [0x000F], r0
- 
+  call pause
+  mov r2, [0x000F]
+  cmp r0, r2
+  jne init_ivt_fail
+
+  mov r1, STRING_DONE
+  call print
+  call newline
+
+  mov r1, STRING_ISR_DISKR
+  call print
   mov r0, interrupts.disk_read
   mov [0x0010], r0
- 
+  call pause
+  mov r2, [0x0010]
+  cmp r0, r2
+  jne init_ivt_fail
+
+  mov r1, STRING_DONE
+  call print
+  call newline
+
+  mov r1, STRING_ISR_DISKW
+  call print
   mov r0, interrupts.disk_write
   mov [0x0011], r0
- 
+  call pause
+  mov r2, [0x0011]
+  cmp r0, r2
+  jne init_ivt_fail
+
+  mov r1, STRING_DONE
+  call print
+  call newline
+
+  mov r1, STRING_ISR_PWR
+  call print
   mov r0, interrupts.power_mode
   mov [0x0012], r0
- 
+  call pause
+  mov r2, [0x0012]
+  cmp r0, r2
+  jne init_ivt_fail
+
+  mov r1, STRING_DONE
+  call print
+  call newline
+
   ret
  
+init_ivt_fail:
+  mov r1, STRING_IVT_LOAD_FAIL
+  call print
+
+  hlt
+
 init_ivt_clr:
   mov r0, 0x0000
   mov r1, 0x00DF
@@ -844,10 +984,25 @@ init_ivt_clr_loop_end:
   clf
   ret
  
- 
+;$$far
+; Pauses for a longer time.
+mass_pause: 
+  call pause
+  call pause
+  call pause
+  call pause
+  call pause
+  ret
+
+
 ;$$far
 ; main bios runtime
 ; sets up everything
+; 1. run memory test
+; 2. initialize the keyboard buffer
+; 3. initialize the IVT
+; 4. read boot tables
+; 5. jump to os
 bios_main:
   dhi ; Disable interrupts, they are not allowed during main BIOS initialization
   call init_early_video
@@ -878,14 +1033,11 @@ bios_main:
  
   call init_ivt
  
-  mov r1, STRING_DONE
-  call print
- 
   call newline
  
   mov r1, STRING_BOOT_INIT
   call print
- 
+  
   call VALIDATE_BMT
  
   mov r1, STRING_DONE
@@ -897,25 +1049,18 @@ bios_main:
  
   push r12
   call PRINT_BMT_OS_NAME
-  call pause
-  call pause
-  call pause
- 
-  call newline
-  call newline
- 
-  mov r14, VIDEO_MEMORY_BASE
 
+  call mass_pause
+
+  mov r14, VIDEO_MEMORY_BASE
 
   mov r1, STRING_INFO
   call print
  
-  call pause
-  call pause
-  call pause
+  call mass_pause
  
   call newline
- 
+
   pop r12
   ; setup a clean state for the OS
   sub r0, r0, r0
@@ -1029,7 +1174,7 @@ R15_SAVE:
 ; 136: RESET
  
 STRING_BIOS_BANNER:
-%defineword 134, "VSK sysROM BIOS v1.4.1", 10
+%defineword 134, "VSK sysROM BIOS v1.5.2", 10
 %defineword      "VSK-E16A PROPRIETARY ROM BIOS", 10, 10
 %defineword      "Copyright (c) VSK Software 2026. All rights reserved.", 136, 0
  
@@ -1042,7 +1187,7 @@ STRING_INTERRUPT_INIT:
 STRING_BOOT_INIT:
 %defineword 133, "Reading boot tables...", 0
  
-K_SUFFIX:
+STRING_K_SUFFIX:
 %defineword 133, "K", 0
  
 STRING_DONE:
@@ -1086,12 +1231,45 @@ STRING_INFO:
 %defineword      "[0x0000+0x10FF] BIOS RESERVED ",           10
 %defineword      "[0x10FF+0xDF00] FREE          ",           10
 %defineword      "[0xF000+0x009B] KEYBOARD      ",           10
-%defineword      "[0xF100+0x0F00] VIDEO         ",           10
+%defineword      "[0xF100+0x0F00] VIDEO         ",           10,10,10
+
+%defineword 131, "Copyright (c) VSK software 2026. All rights reserved.", 0
  
-%defineword 0
+%defineword 136, 0
 
 
+STRING_AT:
+  %defineword " at ", 0
 
+STRING_QUOTE:
+  %defineword 39, 0
+
+STRING_ISR_KBUF:
+  %defineword 133, "  ISR 0x01 (clrkbf)............", 0
+
+STRING_ISR_VBUF:
+  %defineword 133, "  ISR 0x02 (clrvbf)............", 0
+
+STRING_ISR_TTY:
+  %defineword 133, "  ISR 0x0E (tty)...............", 0
+
+STRING_ISR_AWAIT:
+  %defineword 133, "  ISR 0x0F (pause).............", 0
+
+STRING_ISR_DISKR:
+  %defineword 133, "  ISR 0x10 (disk read).........", 0
+
+STRING_ISR_DISKW:
+  %defineword 133, "  ISR 0x11 (disk write)........", 0
+
+STRING_ISR_PWR:
+  %defineword 133, "  ISR 0x12 (powercfg)..........", 0
+
+STRING_ISR_FAIL:
+  %defineword 130, " failed", 0
+
+STRING_IVT_LOAD_FAIL:
+  %defineword 133, "Interrupt initialization failed", 0
 
 
 

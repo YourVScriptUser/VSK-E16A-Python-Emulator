@@ -124,11 +124,11 @@ class numbertools:
  def negative(num):
      return num < 0
  @staticmethod      
- def cap(num, min=0, max=100):
-    if num > max:
-        return max
-    elif num < min:
-        return min
+ def cap(num, low: int=0, high: int=100) -> int:
+    if num > high:
+        return high
+    elif num < low:
+        return low
     else:
         return num
  @staticmethod
@@ -319,7 +319,7 @@ class Dynamic_Loading_Bar:
         self.percent += how_much
         if self.percent + how_much > 100:
             self.percent = 100
-        self.percent = numtools.cap(self.percent, min=0, max=100)
+        self.percent = numtools.cap(self.percent, low=0, high=100)
         self.bar = "[" + "#" * self.percent + "-" * (100 - self.percent) + "]"
         clearscreen()
         printg(f"{self.name}")

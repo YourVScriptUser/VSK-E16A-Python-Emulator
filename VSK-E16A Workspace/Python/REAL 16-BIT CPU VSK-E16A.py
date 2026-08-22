@@ -114,6 +114,10 @@ def open_debug_gui(update_interval=50):
       - Nonzero-byte memory usage stays on a 2s cadence scan.
       - Register flash uses direct widget config, no per-tick allocation
         beyond what actually changed.
+      - Motherboard Visualizer tab is fully lazy: its geometry is built
+        exactly once, on first visibility, and its per-tick update
+        function returns immediately (no-op) whenever that tab is not
+        the selected tab -- so it costs nothing while hidden.
     """
  
     BG        = "#0a0f1a"
@@ -347,6 +351,327 @@ def open_debug_gui(update_interval=50):
             disasm_text.tag_configure("mnem", foreground=DECOMP_FG)
             disasm_text.config(state="disabled")
  
+            # ---- Tab: Motherboard Visualizer ----
+            # Zero cost while not selected: geometry is built exactly once,
+            # on first visibility, and per-tick updates are skipped entirely
+            # unless mobo_tab_is_visible() is true (mirrors the disassembly
+            # tab's own visibility gate above).
+            PCB_GREEN       = "#0b3d1f"   # board substrate
+            PCB_GREEN_LT    = "#0e4a26"   # slightly lighter panel green (unused headroom for future chip fills)
+            PCB_EDGE        = "#062712"   # darker board edge / mounting rim
+            SILK_WHITE      = "#e8f0e8"   # silkscreen text
+            SILK_DIM        = "#7fa88f"   # dim silkscreen labels
+            CHIP_BODY       = "#111418"   # IC package body (matte black plastic)
+            CHIP_EDGE       = "#2a2f36"
+            PIN_OFF         = "#6b5e1a"   # dull yellow
+            PIN_ON          = "#f5d90a"   # solid yellow
+            TRACE_OFF       = "#274d34"   # unlit copper trace (dark green-copper, not neon)
+            TRACE_ON        = "#f5d90a"   # lit trace = solid yellow (matches pins)
+            PAD_COPPER      = "#c98a2c"   # unlit copper pad ring (decorative package pins only)
+ 
+            mobo_tab = tk.Frame(nb, bg=PCB_EDGE)
+            nb.add(mobo_tab, text=" MOTHERBOARD ")
+ 
+            mobo_canvas = tk.Canvas(mobo_tab, bg=PCB_EDGE, highlightthickness=0)
+            mobo_canvas.pack(fill="both", expand=True, padx=10, pady=10)
+ 
+            mobo_built = {"v": False}
+            last_mobo_tab_visible = {"v": False}
+ 
+            mobo_reg_led_ids = {}      # reg index -> list of 16 rect ids, MSB..LSB
+            mobo_flag_led_ids = {}     # name -> list of rect ids
+            mobo_ram_bit_ids = []      # 16 rect ids along RAM chip edge, MSB..LSB
+            mobo_sio_bit_ids = []      # 8 rect ids on Super I/O showing PMIO stack depth
+            mobo_clk_trace_ids = []    # segments of the CLK bus (touches all 4 chips)
+            mobo_extra_trace_ids = {}  # name -> list of segment ids
+            mobo_last_state = {
+                "cycle": None, "regs": [None] * 16, "flag": None,
+                "ipreg": None, "sp": None, "iF": None,
+                "pmio_depth": None, "fault": None, "video_frame": None,
+            }
+ 
+            def _mobo_led_row(canvas, x, y, count, cellsz=10, gap=2):
+                ids = []
+                for i in range(count):
+                    rx, ry = x + i * (cellsz + gap), y
+                    rid = canvas.create_rectangle(
+                        rx, ry, rx + cellsz, ry + cellsz,
+                        fill=PIN_OFF, outline="#332c0a", width=1
+                    )
+                    ids.append(rid)
+                return ids
+ 
+            def build_motherboard():
+                """Static PCB geometry — runs exactly once, ever."""
+                if mobo_built["v"]:
+                    return
+                mobo_built["v"] = True
+ 
+                W, H = 1620, 780
+                mobo_canvas.configure(scrollregion=(0, 0, W, H))
+ 
+                # ---- Board substrate ----
+                mobo_canvas.create_rectangle(6, 6, W - 6, H - 6,
+                                              fill=PCB_GREEN, outline="#083018", width=3)
+                for cx, cy in [(30, 30), (W - 30, 30), (30, H - 30), (W - 30, H - 30)]:
+                    mobo_canvas.create_oval(cx - 9, cy - 9, cx + 9, cy + 9,
+                                             fill=PCB_EDGE, outline="#0a2e17", width=2)
+                    mobo_canvas.create_oval(cx - 3, cy - 3, cx + 3, cy + 3,
+                                             fill="#3a4a3f", outline="")
+ 
+                # ---- Fixed chip footprints (no overlap by construction) ----
+                cpu_x, cpu_y, cpu_w, cpu_h = 60, 90, 340, 600
+                ram_x, ram_y, ram_w, ram_h = 640, 90, 260, 220
+                vid_x, vid_y, vid_w, vid_h = 840, 400, 260, 160
+                sio_x, sio_y, sio_w, sio_h = 980, 90, 260, 220
+ 
+                def draw_chip(x, y, w, h, label1, label2=None):
+                    mobo_canvas.create_rectangle(x, y, x + w, y + h,
+                                                  fill=CHIP_BODY, outline=CHIP_EDGE, width=2)
+                    mobo_canvas.create_arc(x + w / 2 - 14, y - 10, x + w / 2 + 14, y + 14,
+                                            start=200, extent=140, style="arc",
+                                            outline=CHIP_EDGE, width=2)
+                    mobo_canvas.create_text(x + w / 2, y + 26, text=label1,
+                                             fill=SILK_WHITE, font=(mono_name, 13, "bold"))
+                    if label2:
+                        mobo_canvas.create_text(x + w / 2, y + 46, text=label2,
+                                                 fill=SILK_DIM, font=(mono_name, 9))
+ 
+                draw_chip(cpu_x, cpu_y, cpu_w, cpu_h, "VSK-E16A 2026", "CPU / MICROCODE UNIT")
+                draw_chip(ram_x, ram_y, ram_w, ram_h, "64K RAM", "SYSTEM MEMORY")
+                draw_chip(vid_x, vid_y, vid_w, vid_h, "Video Output", "MMIO 0xF100")
+                draw_chip(sio_x, sio_y, sio_w, sio_h, "Super I/O", "PMIO CONTROLLER")
+ 
+                # ---- Decorative package pins along CPU's left edge (fixed count) ----
+                n_pkg_pins = 14
+                pin_span = cpu_h - 60
+                for i in range(n_pkg_pins):
+                    py = cpu_y + 30 + i * (pin_span / (n_pkg_pins - 1))
+                    mobo_canvas.create_rectangle(cpu_x - 14, py - 3, cpu_x, py + 3,
+                                                  fill=PAD_COPPER, outline="#7a5418")
+ 
+                # ---- Register LED block ----
+                # Sits fully inside the chip body, well below label2, with a
+                # reserved left column wide enough that the "R15" / "FLAGS"
+                # labels never crowd the LEDs, and enough top clearance from
+                # label2 that nothing here can ever sit under a trace (all
+                # traces are routed outside the chip's own footprint).
+                label_col_w = 46
+                led_x0 = cpu_x + label_col_w
+                led_y0 = cpu_y + 74
+                row_h = 16
+                cellsz = 10
+                gap = 2
+                for r in range(16):
+                    ry = led_y0 + r * row_h
+                    mobo_canvas.create_text(led_x0 - 8, ry + cellsz / 2, text=f"R{r}",
+                                             fill=SILK_WHITE, font=(mono_name, 9), anchor="e")
+                    ids = _mobo_led_row(mobo_canvas, led_x0, ry, 16, cellsz=cellsz, gap=gap)
+                    mobo_reg_led_ids[r] = ids
+ 
+                flag_y = led_y0 + 16 * row_h + 12
+                mobo_canvas.create_line(led_x0 - 8, flag_y - 6, cpu_x + cpu_w - 14, flag_y - 6,
+                                         fill="#1c3a26", width=1)
+                specials = [("IF", 1), ("FLAGS", 16), ("IP", 16), ("SP", 16)]
+                sy = flag_y
+                for name, width in specials:
+                    mobo_canvas.create_text(led_x0 - 8, sy + cellsz / 2, text=name,
+                                             fill=SILK_WHITE, font=(mono_name, 9), anchor="e")
+                    ids = _mobo_led_row(mobo_canvas, led_x0, sy, width, cellsz=cellsz, gap=gap)
+                    mobo_flag_led_ids[name] = ids
+                    sy += row_h
+ 
+                # ---- RAM address-bus pins along RAM chip's bottom edge (IP binary) ----
+                ram_pin_y = ram_y + ram_h - 34
+                ram_pin_x0 = ram_x + 18
+                ram_pin_span = ram_w - 36
+                mobo_canvas.create_text(ram_x + ram_w / 2, ram_pin_y - 14,
+                                         text="ADDR/IP BUS (MSB \u2192 LSB)",
+                                         fill=SILK_DIM, font=(mono_name, 7))
+                bit_cell = (ram_pin_span - 15 * 2) / 16
+                for i in range(16):
+                    bx = ram_pin_x0 + i * (bit_cell + 2)
+                    rid = mobo_canvas.create_rectangle(bx, ram_pin_y, bx + bit_cell, ram_pin_y + 12,
+                                                        fill=PIN_OFF, outline="#332c0a", width=1)
+                    mobo_ram_bit_ids.append(rid)
+ 
+                # ---- CLK trace: single bus along the bottom touching all four chips ----
+                clk_y = H - 60
+                clk_segs = []
+                clk_segs.append(mobo_canvas.create_line(
+                    cpu_x + cpu_w / 2, cpu_y + cpu_h, cpu_x + cpu_w / 2, clk_y,
+                    fill=TRACE_OFF, width=4))
+                clk_segs.append(mobo_canvas.create_line(
+                    ram_x + ram_w / 2, ram_y + ram_h, ram_x + ram_w / 2, clk_y,
+                    fill=TRACE_OFF, width=4))
+                clk_segs.append(mobo_canvas.create_line(
+                    vid_x + vid_w / 2, vid_y + vid_h, vid_x + vid_w / 2, clk_y,
+                    fill=TRACE_OFF, width=4))
+                clk_segs.append(mobo_canvas.create_line(
+                    sio_x + sio_w / 2, sio_y + sio_h, sio_x + sio_w / 2, clk_y,
+                    fill=TRACE_OFF, width=4))
+                clk_segs.append(mobo_canvas.create_line(
+                    cpu_x + cpu_w / 2, clk_y, sio_x + sio_w / 2, clk_y,
+                    fill=TRACE_OFF, width=4))
+                mobo_canvas.create_text(cpu_x + cpu_w / 2 - 26, clk_y + 14, text="CLK BUS",
+                                         fill=SILK_DIM, font=(mono_name, 8))
+                mobo_clk_trace_ids.extend(clk_segs)
+ 
+                # ---- FAULT trace: CPU -> RAM, upper channel above the RAM pin strip ----
+                fault_y = cpu_y + 24
+                f1 = mobo_canvas.create_line(cpu_x + cpu_w, fault_y, ram_x, ram_y + 30,
+                                              fill=TRACE_OFF, width=3)
+                mobo_canvas.create_text((cpu_x + cpu_w + ram_x) / 2, fault_y - 12, text="FAULT",
+                                         fill=SILK_DIM, font=(mono_name, 8))
+                mobo_extra_trace_ids["fault"] = [f1]
+ 
+                # ---- VIDEO traces: three separate lines CPU -> Video Output, each its
+                #      own fixed channel so multiple traces are visibly distinct and
+                #      none crosses the CLK bus, FAULT line, or PMIO/SIO lines ----
+                vid_y1 = cpu_y + 90
+                vid_y2 = cpu_y + 130
+                vid_y3 = cpu_y + 170
+                v1 = mobo_canvas.create_line(cpu_x + cpu_w, vid_y1, vid_x, vid_y + 24,
+                                              fill=TRACE_OFF, width=3)
+                v2 = mobo_canvas.create_line(cpu_x + cpu_w, vid_y2, vid_x, vid_y + 54,
+                                              fill=TRACE_OFF, width=3)
+                v3 = mobo_canvas.create_line(cpu_x + cpu_w, vid_y3, vid_x, vid_y + 84,
+                                              fill=TRACE_OFF, width=3)
+                mobo_canvas.create_text((cpu_x + cpu_w + vid_x) / 2, vid_y1 - 12, text="VOUT DATA",
+                                         fill=SILK_DIM, font=(mono_name, 8))
+                mobo_canvas.create_text((cpu_x + cpu_w + vid_x) / 2, vid_y2 - 12, text="VOUT ADDR",
+                                         fill=SILK_DIM, font=(mono_name, 8))
+                mobo_canvas.create_text((cpu_x + cpu_w + vid_x) / 2, vid_y3 - 12, text="VOUT STROBE",
+                                         fill=SILK_DIM, font=(mono_name, 8))
+                mobo_extra_trace_ids["video"] = [v1, v2, v3]
+ 
+                # ---- PMIO traces: CPU <-> Super I/O, and Super I/O -> RAM
+                #      (disk reads/writes route through PMIO into RAM) ----
+                pmio_y1 = cpu_y + 220
+                p1 = mobo_canvas.create_line(cpu_x + cpu_w, pmio_y1, sio_x, sio_y + 30,
+                                              fill=TRACE_OFF, width=3)
+                mobo_canvas.create_text((cpu_x + cpu_w + sio_x) / 2, pmio_y1 - 12, text="PMIO",
+                                         fill=SILK_DIM, font=(mono_name, 8))
+                p2 = mobo_canvas.create_line(sio_x, sio_y + sio_h - 30, ram_x + ram_w, ram_y + ram_h - 30,
+                                              fill=TRACE_OFF, width=3)
+                mobo_canvas.create_text((sio_x + ram_x + ram_w) / 2, sio_y + sio_h - 42, text="SIO\u2194RAM",
+                                         fill=SILK_DIM, font=(mono_name, 7))
+                mobo_extra_trace_ids["pmio"] = [p1, p2]
+ 
+                # ---- Super I/O activity LEDs (stack depth pins, MSB..LSB of depth) ----
+                sio_pin_y = sio_y + 66
+                sio_pin_x0 = sio_x + 18
+                mobo_canvas.create_text(sio_x + sio_w / 2, sio_pin_y - 12,
+                                         text="PMIO STACK DEPTH", fill=SILK_DIM, font=(mono_name, 7))
+                sio_bit_span = sio_w - 36
+                sio_bit_cell = (sio_bit_span - 7 * 2) / 8
+                for i in range(8):
+                    bx = sio_pin_x0 + i * (sio_bit_cell + 2)
+                    rid = mobo_canvas.create_rectangle(bx, sio_pin_y, bx + sio_bit_cell, sio_pin_y + 12,
+                                                        fill=PIN_OFF, outline="#332c0a", width=1)
+                    mobo_sio_bit_ids.append(rid)
+ 
+                # ---- Legend (static) ----
+                lx, ly = 60, H - 40
+                mobo_canvas.create_rectangle(lx, ly, lx + 12, ly + 12, fill=PIN_ON, outline="#332c0a")
+                mobo_canvas.create_text(lx + 18, ly + 6, text="= ON", fill=SILK_DIM,
+                                         font=(mono_name, 8), anchor="w")
+                mobo_canvas.create_rectangle(lx + 70, ly, lx + 82, ly + 12, fill=PIN_OFF, outline="#332c0a")
+                mobo_canvas.create_text(lx + 88, ly + 6, text="= OFF", fill=SILK_DIM,
+                                         font=(mono_name, 8), anchor="w")
+ 
+            def mobo_tab_is_visible():
+                try:
+                    return nb.select() == str(mobo_tab)
+                except Exception:
+                    return False
+ 
+            def _bits16(v):
+                return [(v >> b) & 1 for b in range(15, -1, -1)]  # MSB..LSB
+ 
+            def update_motherboard_view(force=False):
+                visible = mobo_tab_is_visible()
+                just_became_visible = visible and not last_mobo_tab_visible[0]
+                last_mobo_tab_visible[0] = visible
+ 
+                if not visible:
+                    return  # zero-cost path: nothing below this line runs
+ 
+                if not mobo_built["v"]:
+                    build_motherboard()
+                force = force or just_became_visible
+ 
+                for r in range(16):
+                    newv = Registers.regs16[r]
+                    if force or mobo_last_state["regs"][r] != newv:
+                        bits = _bits16(newv)
+                        ids = mobo_reg_led_ids[r]
+                        for i, bit in enumerate(bits):
+                            mobo_canvas.itemconfig(ids[i], fill=(PIN_ON if bit else PIN_OFF))
+                        mobo_last_state["regs"][r] = newv
+ 
+                if force or mobo_last_state["iF"] != Registers.iF:
+                    mobo_canvas.itemconfig(mobo_flag_led_ids["IF"][0],
+                                            fill=(PIN_ON if Registers.iF else PIN_OFF))
+                    mobo_last_state["iF"] = Registers.iF
+ 
+                if force or mobo_last_state["flag"] != Registers.flag:
+                    bits = _bits16(Registers.flag)
+                    for i, bit in enumerate(bits):
+                        mobo_canvas.itemconfig(mobo_flag_led_ids["FLAGS"][i],
+                                                fill=(PIN_ON if bit else PIN_OFF))
+                    mobo_last_state["flag"] = Registers.flag
+ 
+                if force or mobo_last_state["ipreg"] != Registers.ip:
+                    bits = _bits16(Registers.ip)
+                    for i, bit in enumerate(bits):
+                        mobo_canvas.itemconfig(mobo_flag_led_ids["IP"][i],
+                                                fill=(PIN_ON if bit else PIN_OFF))
+                    for i, bit in enumerate(bits):
+                        mobo_canvas.itemconfig(mobo_ram_bit_ids[i],
+                                                fill=(PIN_ON if bit else PIN_OFF))
+                    mobo_last_state["ipreg"] = Registers.ip
+ 
+                if force or mobo_last_state["sp"] != Registers.stack:
+                    bits = _bits16(Registers.stack)
+                    for i, bit in enumerate(bits):
+                        mobo_canvas.itemconfig(mobo_flag_led_ids["SP"][i],
+                                                fill=(PIN_ON if bit else PIN_OFF))
+                    mobo_last_state["sp"] = Registers.stack
+ 
+                if force or mobo_last_state["cycle"] != Values.cycle:
+                    lit = (Values.cycle % 2 == 0)
+                    color = TRACE_ON if lit else TRACE_OFF
+                    for seg in mobo_clk_trace_ids:
+                        mobo_canvas.itemconfig(seg, fill=color)
+                    mobo_last_state["cycle"] = Values.cycle
+ 
+                fault_now = bool(Values.T_FAULT)
+                if force or mobo_last_state["fault"] != fault_now:
+                    color = TRACE_ON if fault_now else TRACE_OFF
+                    for seg in mobo_extra_trace_ids["fault"]:
+                        mobo_canvas.itemconfig(seg, fill=color)
+                    mobo_last_state["fault"] = fault_now
+ 
+                pmio_now = len(Memory.pmio_stack)
+                if force or mobo_last_state["pmio_depth"] != pmio_now:
+                    color = TRACE_ON if pmio_now > 0 else TRACE_OFF
+                    for seg in mobo_extra_trace_ids["pmio"]:
+                        mobo_canvas.itemconfig(seg, fill=color)
+                    depth_bits = [(pmio_now >> b) & 1 for b in range(7, -1, -1)]
+                    for i, bit in enumerate(depth_bits):
+                        mobo_canvas.itemconfig(mobo_sio_bit_ids[i],
+                                                fill=(PIN_ON if bit else PIN_OFF))
+                    mobo_last_state["pmio_depth"] = pmio_now
+ 
+                frame_now = Microcode._last_frame
+                if force or mobo_last_state["video_frame"] != frame_now:
+                    changed = mobo_last_state["video_frame"] is not None and frame_now != mobo_last_state["video_frame"]
+                    color = TRACE_ON if changed else TRACE_OFF
+                    for seg in mobo_extra_trace_ids["video"]:
+                        mobo_canvas.itemconfig(seg, fill=color)
+                    mobo_last_state["video_frame"] = frame_now
+ 
             # ---- Tab: Live Patch ----
             patch_tab = tk.Frame(nb, bg=PANEL_BG)
             nb.add(patch_tab, text=" LIVE PATCH ")
@@ -510,8 +835,6 @@ def open_debug_gui(update_interval=50):
                     mem_text.tag_add("pc_word", f"{line_no}.{col_start}", f"{line_no}.{col_end}")
                     last_pc_word_line[0] = pc_word_range
  
-                # force-follow every tick while enabled, regardless of
-                # whether IP moved since the toggle was flipped
                 if follow_pc["v"]:
                     mem_text.see(f"{pc_line_index + 1}.0")
  
@@ -595,11 +918,6 @@ def open_debug_gui(update_interval=50):
                     return line_addr, f"{mnem.lower()} " + ", ".join(args), pos + argc
  
             def disasm_tab_is_visible():
-                # Compare the actual widget, not the tab's label text.
-                # Label-string comparisons (" DISASSEMBLY ") can silently
-                # fail to match depending on theme/platform whitespace
-                # handling, which permanently starves update_disasm_view()
-                # of its trigger even while IP keeps changing.
                 try:
                     return nb.select() == str(disasm_tab)
                 except Exception:
@@ -646,10 +964,11 @@ def open_debug_gui(update_interval=50):
                     disasm_text.see(f"{cur_line_idx + 1}.0")
                 disasm_text.config(state="disabled")
  
-            # Redraw immediately whenever the user clicks onto the tab,
+            # Redraw immediately whenever the user clicks onto a tab,
             # instead of waiting for the next 50ms poll to notice.
             def on_tab_changed(event=None):
                 update_disasm_view(force=disasm_tab_is_visible())
+                update_motherboard_view(force=mobo_tab_is_visible())
             nb.bind("<<NotebookTabChanged>>", on_tab_changed)
  
             def update_pmio_view():
@@ -689,9 +1008,19 @@ def open_debug_gui(update_interval=50):
  
             def return_guest_usage_percent():
                 current_clock = Values.SPEED
-                theory_max = 800
+                theory_max = 1250
+                # Theoretical max clock was calculated by:
+                """
+                  l:
+                    jmp l
+                """
+                # clock was measured while the loop ran.
  
                 percent = round((current_clock / theory_max) * 100, 1)
+
+                # still cap the clock to 0-100
+                percent = numbertools.cap(percent, 0, 100) 
+
                 return percent
  
             def update_gui():
@@ -738,6 +1067,11 @@ def open_debug_gui(update_interval=50):
                     # gate, which could "consume" an IP-change event while
                     # the tab was hidden and leave it permanently stale.
                     update_disasm_view()
+ 
+                    # Same no-op-when-hidden contract as update_disasm_view():
+                    # returns immediately unless the Motherboard tab is the
+                    # one currently selected.
+                    update_motherboard_view()
  
                     root.after(update_interval, update_gui)
                 except Exception:
@@ -971,6 +1305,8 @@ class Values:
      IVT                     = 0x0000
      IVT_END                 = 0x00FF
      SPEED                   = 0
+     REFRESH_INTERVAL        = 0.03333   # 30hz (seconds)
+     CAN_REFRESH             = False
  
  
 class InterruptVectors:
@@ -1482,56 +1818,8 @@ class Microcode:
                 raise OpcodeTrap
          
       
-          def _video_out():
-              # Updated even further to reduce screen flicker.
-     
-              color_map = {
-                  130: colors.RED,
-                  131: colors.GREEN,
-                  132: colors.BLUE,
-                  133: colors.BRIGHT_BLACK,
-                  134: colors.CYAN,
-                  135: colors.BG_RED,
-                  136: colors.RESET
-              }
-     
-              Fbuf = []
-              _pointer = Values.VIDEO_MEMORY_3839_MODE
-              while True:
-                  if _pointer > 0xFFFF:
-                      _pointer = 0x0000
-                      raise MMIO_OutOfBounds
-     
-                  current_byte = Memory.memory[_pointer]
-                  if current_byte == 0:
-                      break
-     
-                  if 0 <= current_byte <= 127:
-                      Fbuf.append(chr(current_byte))
-                  elif current_byte in color_map:
-                      Fbuf.append(color_map[current_byte])
-     
-                  _pointer += 1
-     
-              frame_str = "".join(Fbuf)
-     
-              # if the frame didn't change, don't do the refresh
-              if frame_str == Microcode._last_frame:
-                  return
-             
-              Microcode._last_frame = frame_str
-     
-              # reset cursor to 0,0 and append the new frame
-              sys.stdout.write(colors.RESET + "\033[H\033[2J" + frame_str + "\033[0J")
-              sys.stdout.flush()
-             
-                              
-                       
-                   
-        
-                  
-    
-       
+          # _video_out (vout - opcode 0x8) has been replaced by a refresh thread.
+          # may he live forever in our hearts.
  
    
           def _math(op):
@@ -1791,8 +2079,7 @@ class Microcode:
               0: _einval,
               1: _halt,
               4: _mov,
-              8: _video_out,
- 
+           
               # +4 opcodes
               12: lambda: Microcode._math("ADD"),
               16: lambda: Microcode._math("SUB"),
@@ -1893,8 +2180,7 @@ class VirtualHardware:
                Registers.regs16 = [0] * 16
                Memory.pmio_stack = []
   
-               # Reload from disk
-               load_to_memory(0, LoadImage(DISK_PATH, noPrintStatusString=True))
+               # reload the bios and reboot from existing OS
                load_bios(USE_BIOS_COMPAT, noPrintStatusString=True)
                clearscreen()
                return cpu16.Fetch_loop()
@@ -2013,14 +2299,10 @@ class CPU16:
              return False
          
      def Fetch_loop(self) -> None:
+        Values.CAN_REFRESH = True
+
         try:
           while Registers.ip < Values.MEMORY_SIZE:
-               if (Values.cycle & 0x3FFF) == 0:
-                 if keyboard.is_pressed("p"):
-                    continue
-                 if keyboard.is_pressed("f12"):
-                     interrupt_midrun_terminal()
- 
                if Registers.iF:
                    self.Check_HWI_status()
  
@@ -2050,94 +2332,62 @@ def is_key_down():
            
         return ord(char)
     return False
- 
- 
-def interrupt_midrun_terminal():
-    # Terminal that runs during VM execution instead of before
-    # Has commands for editing live memory, changing cpu state
-    # Enterable via F12
-    # CLEARS THE EMULATOR SCREEN!
- 
-    clearscreen()
-    print(f"""{colors.RESET}
-VSK-E16A Live Running Shell
-Type 'help' for a list of commands
-""")
+
+def screen_refresh_thread():
+  def refresh_thread():
+  
+    # Refreshes the screen at 30hz
+    # May we have a moment of silence for whatever CPU thread this is running on.
     while True:
-      try:
-        user_input = input('>>>')
+      if Values.CAN_REFRESH:
+          color_map = {
+                            130: colors.RED,
+                            131: colors.GREEN,
+                            132: colors.BLUE,
+                            133: colors.BRIGHT_BLACK,
+                            134: colors.CYAN,
+                            135: colors.BG_RED,
+                            136: colors.RESET
+          }
+  
+          Fbuf = []
+          _pointer = Values.VIDEO_MEMORY_3839_MODE
+          while True:
+              if _pointer > 0xFFFF:
+                  _pointer = 0x0000
+                  raise MMIO_OutOfBounds
+  
+              current_byte = Memory.memory[_pointer]
+              if current_byte == 0:
+                  break
+  
+              if 0 <= current_byte <= 127:
+                  Fbuf.append(chr(current_byte))
+              elif current_byte in color_map:
+                  Fbuf.append(color_map[current_byte])
+  
+              _pointer += 1
+  
+          frame_str = "".join(Fbuf)
+  
+          # if the frame didn't change, don't do the refresh
+          if frame_str == Microcode._last_frame:
+              time.sleep(Values.REFRESH_INTERVAL) # ~30hz
+              continue
+          
+          Microcode._last_frame = frame_str
+  
+          # reset cursor to 0,0 and append the new frame
+          sys.stdout.write(colors.RESET + "\033[H\033[2J" + frame_str + "\033[0J")
+          sys.stdout.flush()
+  
+          time.sleep(Values.REFRESH_INTERVAL) # ~30hz
+      else:
+          time.sleep(0.3) # so it doesn't bully the CPU when we are not refreshing
+  threading.Thread(target=refresh_thread, daemon=True).start()
  
-        args = user_input.split()[0:]
-        if not args:
-            continue
- 
-        keyword = args[0]
- 
-        if keyword == "exit":
-            print("Awaiting emulator revival ...")
-            return # return to VM loop
- 
-        elif keyword == "write":
-            type = args[1]
-            if type == "register":
-                reg = int(args[2], 0)
-                val = int(args[3], 0)
-                Registers.regs16[reg] = (val & 0xFFFF)
- 
-                print(f"Wrote {b16hex(val)} to register {reg}")
- 
-            if type == "rSP":
-                val = int(args[2], 0)
-                Registers.stack = val & 0xFFFF
-                print(f"Set rSP to {b16hex(val)}")
-           
-            elif type == "rIP":
-                val = int(args[2], 0)
-                Registers.ip = val & 0xFFFF
-                print(f"Set rIP to {b16hex(val)}")
- 
-            elif type == "memory":
-                addr = int(args[2], 0)
-                val = int(args[3], 0)
-           
-                Memory.memory[addr & 0xFFFF] = val & 0xFFFF
-           
-                print(f"Wrote {b16hex(val)} to {b16hex(addr)}")
- 
-        elif keyword == "funmode":
-            threading.Thread(target=Flopper, daemon=True).start()
-            print("the RBF machine is running!")
- 
-        elif keyword == "restart":
-            Registers.ip = 0x0000
-            Registers.stack = 0x0000
-            Registers.regs16 = [0] * 16   
-            # Reload from disk
-            load_to_memory(0, LoadImage(DISK_PATH))
-            load_bios(USE_BIOS_COMPAT)
-            clearscreen()
-            return cpu16.Fetch_loop()
-           
- 
-        elif keyword == "help":
-            print("""
-help: print this menu
-exit: exit the shell
-write [register, rSP, rIP, memory] [addr/reg] [val]: write something into the emulator
-funmode: activate the memory corruptor (random bit flopper)
-restart: restart the VM, booting from disk
- 
-""")
- 
- 
- 
-               
-                
-      except:
-          print("The command is invalid.")
-   
- 
- 
+# interrupt shell removed
+# everything possible through GUI
  
 def time_triple_fault_cancel():
     # After 10 seconds, resets triple fault status.
@@ -2200,6 +2450,8 @@ def make_mem_dump(noPrintStatusString=False):
         print(f"Memory dump created\nView it at: {DUMP_PATH}\n")
  
 def Finally(ec=0, ea=0):
+    Values.CAN_REFRESH = False
+
     print("\n")
     pymsgbox.alert(text="The CPU is halted.", title="VM Execution stopped")
     print(f"{colors.RED}|!| TRIPLE FAULT |!|\n\nError: {ec}\n\nAddress: {b16hex(ea)}{colors.BRIGHT_BLACK}" if Values.T_FAULT else "")
@@ -2241,7 +2493,6 @@ def Finally(ec=0, ea=0):
         time.sleep(0.01)
  
 def clock_monitor():
-    # shoutout to ChatGPT
     last_cycles = Values.cycle
     last_time = time.perf_counter()
  
@@ -2270,8 +2521,10 @@ hide_cursor()
 print(colors.RESET)
 cpu16 = CPU16()
 clearscreen()
+screen_refresh_thread()
 time.sleep(1)
 cpu16.Fetch_loop()
+
  
 print("The emulator mysteriously stopped.\nThis error should not happen.\n\n(cpu16.Fetch_loop() exited without reason)")
 sys.exit(238)
